@@ -8,15 +8,13 @@ import { env } from "./config/env.js";
 // import { bullBoardAdapter } from "./bullboard/dashboard.js";
 // import basicAuth from "express-basic-auth";
 
+import userRoutes from "./routes/user.route.js";
+
 // Import Bull workers to start processing jobs
-// import "./jobs/update-community-booster.job.js";
-// import "./jobs/notifications.job.js";
-// import "./jobs/quests-calculation.job.js";
-// import "./jobs/weekly-rewards-airdrop.job.js";
-// import "./workers/quests-calculation.worker.js";
-// import "./workers/crop-notifications.worker.js";
+// ...
 
 import http from "http";
+import { validateApiSecret } from "./middleware/auth.middleware.js";
 
 // import { baseOrigins } from "./lib/cors.js";
 
@@ -44,7 +42,7 @@ app.get("/health", (req, res) => {
 });
 
 // Protected API routes
-// ...
+app.use("/api/user", validateApiSecret, userRoutes);
 
 // Interact with BullMQ queues
 // if (env.NODE_ENV === "development" && env.ENABLE_BULLBOARD === true) {
