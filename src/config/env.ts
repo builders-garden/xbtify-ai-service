@@ -21,7 +21,6 @@ const envSchema = z.object({
 
   // Database
   DATABASE_URL: z.string().url(),
-  DIRECT_URL: z.string().url(),
 
   // Redis
   REDIS_URL: z.string().url(),
