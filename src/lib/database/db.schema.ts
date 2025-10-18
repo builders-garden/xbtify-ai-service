@@ -87,6 +87,26 @@ export type CreateCast = typeof castTable.$inferInsert;
 export type UpdateCast = Partial<CreateCast>;
 
 /**
+ * Reply table
+ */
+export const replyTable = pgTable(
+	"reply",
+	{
+		hash: text("hash").primaryKey(),
+		fid: integer("fid").notNull(),
+		text: text("text").notNull(),
+		parentText: text("parent_text").notNull(),
+		parentAuthorFid: text("parent_author_fid").notNull(),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(t) => [index("idx_reply_fid").on(t.fid)],
+);
+
+export type Reply = typeof replyTable.$inferSelect;
+export type CreateReply = typeof replyTable.$inferInsert;
+export type UpdateReply = Partial<CreateReply>;
+
+/**
  * Agent table
  */
 export const agentTable = pgTable(
@@ -99,9 +119,21 @@ export const agentTable = pgTable(
 		creatorFid: integer("creator_fid")
 			.notNull()
 			.references(() => userTable.farcasterFid, { onDelete: "cascade" }),
-		basePrompt: text("base_prompt"),
-		customPrompt: text("custom_prompt"),
-		finalPrompt: text("final_prompt"),
+		// prompt custom sections
+		styleProfilePrompt: text("style_profile_prompt"),
+		topicPatternsPrompt: text("topic_patterns_prompt"),
+		keywords: text("keywords"),
+		// custom prompt questions
+		personality: text("personality"), // degen, artist, business, builder
+		tone: text("tone"), // formal, enthusiastic, humorous, irreverent
+		movieCharacter: text("movie_character"), // hero, villain, supporting, mentor
+		// farcaster user data
+		username: text("username"),
+		displayName: text("display_name"),
+		avatarUrl: text("avatar_url"),
+		address: text("address"),
+		privateKey: text("private_key"),
+
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
@@ -174,6 +206,13 @@ export const walletRelations = relations(walletTable, ({ one }) => ({
 export const castRelations = relations(castTable, ({ one }) => ({
 	user: one(userTable, {
 		fields: [castTable.fid],
+		references: [userTable.farcasterFid],
+	}),
+}));
+
+export const replyRelations = relations(replyTable, ({ one }) => ({
+	user: one(userTable, {
+		fields: [replyTable.fid],
 		references: [userTable.farcasterFid],
 	}),
 }));

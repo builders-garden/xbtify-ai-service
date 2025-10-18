@@ -66,20 +66,25 @@ export const initAgentController = async (req: Request, res: Response) => {
 	}
 };
 
+const reinitSchema = z.object({
+	deleteCasts: z.boolean().optional().default(false),
+	deleteReplies: z.boolean().optional().default(false),
+});
+
 export const reinitializeAgentController = async (
 	req: Request,
 	res: Response,
 ) => {
 	try {
-		const id = req.params.id;
-		if (!id) {
+		const fid = parseInt(req.params.id, 10);
+		if (!fid || isNaN(Number(fid))) {
 			return res.status(400).json({
 				status: "nok",
 				message: "Agent ID is required",
 			});
 		}
 
-		const existingAgent = await getAgentById(id);
+		const existingAgent = await getAgentByFid(fid);
 
 		if (!existingAgent) {
 			return res.status(404).json({
@@ -88,10 +93,14 @@ export const reinitializeAgentController = async (
 			});
 		}
 
+		const safeBody = reinitSchema.parse(req.body);
+
 		await agentReinitializationQueue.add(
 			"agent-reinitialization",
 			{
 				fid: existingAgent.creatorFid,
+				deleteCasts: safeBody.deleteCasts,
+				deleteReplies: safeBody.deleteReplies,
 			},
 			{
 				attempts: 2,
@@ -111,6 +120,15 @@ export const reinitializeAgentController = async (
 			},
 		});
 	} catch (error) {
+
+		if (error instanceof z.ZodError) {
+			return res.status(400).json({
+				status: "nok",
+				message: "Invalid request data",
+				errors: error.errors,
+			});
+		}
+
 		console.error("Error reinitializing agent:", error);
 		res.status(500).json({
 			status: "nok",

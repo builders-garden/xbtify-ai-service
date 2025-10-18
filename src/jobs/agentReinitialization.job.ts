@@ -2,6 +2,8 @@ import { reinitializeAgent } from "../services/agent.service.js";
 
 type AgentReinitializationOptions = {
 	fid: number;
+	deleteCasts: boolean;
+	deleteReplies: boolean;
 };
 
 export async function processAgentReinitialization(
