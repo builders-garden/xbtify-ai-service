@@ -1,3 +1,4 @@
+import type { Agent } from "../lib/database/db.schema.js";
 import { createAgent } from "../lib/database/queries/agent.query.js";
 import {
 	createCasts,
@@ -18,7 +19,6 @@ import {
 	filterRepliesByLength,
 } from "../lib/utils/agent.js";
 import { AgentStatus } from "../types/enums.js";
-import { Agent } from "../lib/database/db.schema.js";
 
 const minLength = 30;
 
@@ -87,18 +87,21 @@ export const reinitializeAgent = async ({ fid, deleteCasts, deleteReplies }: { f
 };
 
 export const handleAskAgent = async ({
-  agent,
-  question,
+	agent,
+	question,
 }: {
-  agent: Agent;
-  question: string;
-}) => {
-  // TODO: add here the logic to handle the question with the agent
+	agent: Agent;
+	question: string;
+}): Promise<{
+	answer: string;
+	agentData: Agent;
+}> => {
+	// TODO: add here the logic to handle the question with the agent
 
-  return {
-    answer: `This is a placeholder answer to your question: "${question}"`,
-    agentData: agent,
-  };
+	return {
+		answer: `This is a placeholder answer to your question: "${question}"`,
+		agentData: agent,
+	};
 };
 
 async function fetchAndStoreFarcasterCasts(fid: number) {
