@@ -50,6 +50,11 @@ const envSchema = z.object({
 	LANGFUSE_SECRET_KEY: z.string().min(1),
 	LANGFUSE_PUBLIC_KEY: z.string().min(1),
 	LANGFUSE_BASE_URL: z.string().url(),
+	
+	// Imagekit
+	IMAGEKIT_PUBLIC_KEY: z.string().min(1),
+	IMAGEKIT_PRIVATE_KEY: z.string().min(1),
+	IMAGEKIT_URL_ENDPOINT: z.string().url(),
 });
 
 export type Env = z.infer<typeof envSchema>;

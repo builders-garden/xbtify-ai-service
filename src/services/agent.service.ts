@@ -34,6 +34,7 @@ import { AgentStatus } from "../types/enums.js";
 import type { AgentInitJobData } from "../types/queue.type.js";
 import { runInitAgent } from "../lib/agent/init_agent.js";
 import { runAssistant } from "../lib/agent/assistant.js";
+import { getNegativeImageAndUpload } from "../lib/image.js";
 
 const minLength = 30;
 
@@ -50,14 +51,25 @@ export const initAgent = async (data: AgentInitJobData) => {
 		const newFname = `${getCleanFarcasterUsername(farcasterUser.username)}xbt`;
 		const newDisplayName = `${farcasterUser.display_name ?? farcasterUser.username} XBT`;
 		// TODO convert add negative filter to pfp and store in s3
-		const pfpUrl = farcasterUser.pfp_url; //? await stylizeImage(farcasterUser.pfp_url) : undefined;
+		let pfpUrl: string | undefined = undefined;
+		if (farcasterUser.pfp_url) {
+			pfpUrl = await getNegativeImageAndUpload(farcasterUser.pfp_url);
+		}
+
+		console.log("Creating Farcaster account with:", {
+			fname: newFname,
+			displayName: newDisplayName,
+			bio: `digital twin of @${farcasterUser.username}`,
+			pfpUrl,
+			url: `https://xbtify.vercel.app/${farcasterUser.fid}`,
+		});
 
 		// step 1: create farcaster user
 		const farcasterAccount = await createFarcasterAccount({
 			fname: newFname,
 			displayName: newDisplayName,
 			bio: `digital twin of @${farcasterUser.username}`,
-			pfpUrl: pfpUrl,
+			pfpUrl,
 			url: `https://xbtify.vercel.app/${farcasterUser.fid}`,
 		});
 		console.log("Farcaster account created:", {
