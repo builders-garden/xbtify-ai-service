@@ -35,6 +35,12 @@ export async function processNeynarWebhookJob(
 			);
 			continue;
 		}
+		if (!agent.privateKey) {
+			console.warn(
+				`[neynar-webhook-job] Agent ${agent.fid} has no private key`,
+			);
+			continue;
+		}
 		const question = cast.text;
 		const response = await handleAskAgent({
 			agent,
