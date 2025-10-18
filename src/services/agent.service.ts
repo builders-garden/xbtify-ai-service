@@ -1,5 +1,4 @@
 import { env } from "../config/env.js";
-import { runInitAgent } from "../lib/agent/init_agent.js";
 import type { Agent, Cast, Reply } from "../lib/database/db.schema.js";
 import {
 	createAgent,
@@ -33,6 +32,8 @@ import {
 import { getCleanFarcasterUsername } from "../lib/utils.js";
 import { AgentStatus } from "../types/enums.js";
 import type { AgentInitJobData } from "../types/queue.type.js";
+import { runInitAgent } from "../lib/agent/init_agent.js";
+import { runAssistant } from "../lib/agent/assistant.js";
 
 const minLength = 30;
 
@@ -100,10 +101,13 @@ export const initAgent = async (data: AgentInitJobData) => {
 
 		// step 4. get replies
 		// const { replies, count: repliesCount } = await fetchAndStoreFarcasterReplies(data.fid);
+		const replies = await getRepliesByFid(data.fid);
+		const repliesCount = replies.length;
 
 		// step 5: generate style_profile_prompt base on casts
 		const style_profile_prompt = await runInitAgent(
 			casts.map((cast) => cast.text).join("\n"),
+			replies.map((reply) => reply.text).join("\n"),
 		);
 
 		// step 6: update style_profile_prompt for agent
@@ -126,6 +130,7 @@ export const initAgent = async (data: AgentInitJobData) => {
 				movieCharacter: updatedAgent?.movieCharacter,
 			},
 			importedCasts: count,
+			importedReplies: repliesCount,
 		};
 	} catch (error) {
 		console.error("[agent.service]:", error);
@@ -182,13 +187,14 @@ export const reinitializeAgent = async ({
 			storedReplies = await getRepliesByFid(fid);
 		}
 
-		// step 3: generate style_profile_prompt base on casts
-		const style_profile_prompt = await runInitAgent(
-			storedCasts.map((cast) => cast.text).join("\n"),
-		);
-		console.log(
-			`[agent.service]: generated style_profile_prompt base on casts: ${style_profile_prompt}`,
-		);
+    // step 3: generate style_profile_prompt base on casts and replies
+    const castsText = JSON.stringify(storedCasts.map((cast) => ({ text: cast.text })));
+    const repliesText = JSON.stringify(storedReplies.map((reply) => ({ parentText: reply.parentText, text: reply.text })));
+    const style_profile_prompt = await runInitAgent(castsText, repliesText);
+    console.log(`[agent.service]: generated style_profile_prompt base on casts and replies: ${style_profile_prompt}`);
+
+    // step 4: update or create agent in database
+    await updateOrCreateAgent(fid, AgentStatus.REINITIALIZING, style_profile_prompt.response);
 
 		// step 4: update or create agent in database
 		await updateOrCreateAgent(
@@ -197,7 +203,7 @@ export const reinitializeAgent = async ({
 			style_profile_prompt.response,
 		);
 
-		return {
+	return {
 			fid,
 			deletedCasts: deletedCastsCount,
 			deletedReplies: deletedRepliesCount,
@@ -214,18 +220,39 @@ export const handleAskAgent = async ({
 	agent,
 	question,
 }: {
-	agent: Agent;
-	question: string;
-}): Promise<{
-	answer: string;
-	agentData: Agent;
-}> => {
-	// TODO: add here the logic to handle the question with the agent
+  agent: Agent;
+  question: string;
+}) => {
+  
+	const styleProfilePrompt = agent.styleProfilePrompt;
 
-	return {
-		answer: `This is a placeholder answer to your question: "${question}"`,
-		agentData: agent,
-	};
+  // Check if style profile exists
+  if (!styleProfilePrompt) {
+    return {
+      answer: "I'm sorry, the agent is not properly initialized. Please try again later.",
+      agentData: agent,
+    };
+  }
+
+  try {
+    // Call the assistant with the style profile and question
+    const assistantResult = await runAssistant(styleProfilePrompt, question);
+    
+    // Parse the JSON response to extract the text field
+    const parsedResponse = JSON.parse(assistantResult.response);
+    console.log(`[agent.service]: assistantResult: ${parsedResponse.text}`);
+    return {
+      answer: parsedResponse.text,
+      agentData: agent,
+    };
+  } catch (error) {
+    console.error('[handleAskAgent] Error processing question:', error);
+    // Return a fallback error message
+    return {
+      answer: "I'm sorry, I couldn't process your question right now. Please try again.",
+      agentData: agent,
+    };
+  }
 };
 
 async function fetchAndStoreFarcasterCasts(fid: number) {
@@ -351,34 +378,41 @@ async function storeNewAgentInDb({
 	return newAgent;
 }
 
-async function updateOrCreateAgent(
-	fid: number,
-	status: AgentStatus,
-	styleProfilePrompt: string,
-) {
-	// Check if agent already exists
-	const existingAgent = await getAgentByFid(fid);
+async function updateOrCreateAgent(fid: number, status: AgentStatus, styleProfilePrompt: string) {
+  // Check if agent already exists
+  const existingAgent = await getAgentByFid(fid);
 
-	if (existingAgent) {
-		// Update existing agent
-		const updatedAgent = await updateAgent(existingAgent.id, {
-			status,
-			styleProfilePrompt,
-		});
-		console.log(
-			`[agent.service|${new Date().toISOString()}]: updated existing agent for fid ${fid} with status ${status}`,
-		);
-		return updatedAgent;
-	}
-	// Create new agent
-	const newAgent = await createAgent({
-		fid: fid,
-		creatorFid: fid,
-		status,
-		styleProfilePrompt,
-	});
-	console.log(
-		`[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`,
-	);
-	return newAgent;
+  // parse styleProfilePrompt to JSON
+  const styleProfilePromptJson = JSON.parse(styleProfilePrompt);
+
+  const patternsPerTopic = styleProfilePromptJson.patterns_per_topic;
+  const keywords = Object.keys(styleProfilePromptJson.keywords);
+  // convert keywords to string
+  const keywordsString = keywords.join(",");
+  
+  if (existingAgent) {	
+    // Update existing agent
+    const updatedAgent = await updateAgent(existingAgent.id, {
+      status,
+      styleProfilePrompt,
+      topicPatternsPrompt: patternsPerTopic,
+      keywords: keywordsString,
+    });
+    console.log(
+      `[agent.service|${new Date().toISOString()}]: updated existing agent for fid ${fid} with status ${status}`
+    );
+    return updatedAgent;
+  } else {
+    // Create new agent
+    const newAgent = await createAgent({
+      fid: fid,
+      creatorFid: fid,
+      status,
+      styleProfilePrompt,
+    });
+    console.log(
+      `[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`
+    );
+    return newAgent;
+  }
 }

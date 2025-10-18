@@ -179,19 +179,19 @@ const askAgentSchema = z.object({
 });
 
 export const handleAskAgentController = async (req: Request, res: Response) => {
-	try {
-		const id = req.params.id;
+  try {
+    const fid = parseInt(req.params.id, 10);
 
-		if (!id) {
-			return res.status(400).json({
-				status: "nok",
-				message: "Agent ID is required",
-			});
-		}
+    if (!fid) {
+      return res.status(400).json({
+        status: "nok",
+        message: "Agent FID is required",
+      });
+    }
 
 		const safeBody = askAgentSchema.parse(req.body);
 
-		const agent = await getAgentById(id);
+    const agent = await getAgentByFid(fid);
 
 		if (!agent) {
 			return res.status(404).json({
