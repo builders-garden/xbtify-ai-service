@@ -9,6 +9,7 @@ import {
 	filterCastsByLength,
 } from "../lib/utils/agent.js";
 import { AgentStatus } from "../types/enums.js";
+import { Agent } from "../lib/database/db.schema.js";
 
 const minLength = 30;
 
@@ -55,6 +56,21 @@ export const reinitializeAgent = async ({ fid }: { fid: number }) => {
 		console.error("[agent.service]:", error);
 		throw error;
 	}
+};
+
+export const handleAskAgent = async ({
+  agent,
+  question,
+}: {
+  agent: Agent;
+  question: string;
+}) => {
+  // TODO: add here the logic to handle the question with the agent
+
+  return {
+    answer: `This is a placeholder answer to your question: "${question}"`,
+    agentData: agent,
+  };
 };
 
 async function fetchAndStoreFarcasterCasts(fid: number) {

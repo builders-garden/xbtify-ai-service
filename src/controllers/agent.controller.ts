@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import {
+  handleAskAgent,
+} from "../services/agent.service.js";
+import {
 	getAgentByFid,
 	getAgentById,
 } from "../lib/database/queries/agent.query.js";
@@ -148,4 +151,58 @@ export const getAgentInfoController = async (req: Request, res: Response) => {
 			error: error instanceof Error ? error.message : "Unknown error",
 		});
 	}
+};
+
+const askAgentSchema = z.object({
+  question: z.string().min(1),
+});
+
+export const handleAskAgentController = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      return res.status(400).json({
+        status: "nok",
+        message: "Agent ID is required",
+      });
+    }
+
+    const safeBody = askAgentSchema.parse(req.body);
+
+    const agent = await getAgentById(id);
+
+    if (!agent) {
+      return res.status(404).json({
+        status: "nok",
+        message: "Agent not found",
+      });
+    }
+
+    const response = await handleAskAgent({
+      agent,
+      question: safeBody.question,
+    });
+
+    // Placeholder response
+    res.status(200).json({
+      status: "ok",
+      data: response,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        status: "nok",
+        message: "Invalid request data",
+        errors: error.errors,
+      });
+    }
+
+    console.error("Error handling ask agent:", error);
+    res.status(500).json({
+      status: "nok",
+      message: "Failed to handle ask agent",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 };
