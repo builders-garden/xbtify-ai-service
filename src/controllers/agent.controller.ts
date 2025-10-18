@@ -73,6 +73,9 @@ export const initAgentController = async (req: Request, res: Response) => {
 const reinitSchema = z.object({
 	deleteCasts: z.boolean().optional().default(false),
 	deleteReplies: z.boolean().optional().default(false),
+	personality: z.string().min(1).optional(),
+	tone: z.string().min(1).optional(),
+	movieCharacter: z.string().min(1).optional(),
 });
 
 export const reinitializeAgentController = async (
@@ -80,11 +83,11 @@ export const reinitializeAgentController = async (
 	res: Response,
 ) => {
 	try {
-		const fid = Number.parseInt(req.params.id, 10);
+		const fid = Number.parseInt(req.params.fid, 10);
 		if (!fid || Number.isNaN(Number(fid))) {
 			return res.status(400).json({
 				status: "nok",
-				message: "Agent ID is required",
+				message: "Agent FID is required",
 			});
 		}
 
@@ -105,6 +108,9 @@ export const reinitializeAgentController = async (
 				fid: existingAgent.creatorFid,
 				deleteCasts: safeBody.deleteCasts,
 				deleteReplies: safeBody.deleteReplies,
+				personality: safeBody.personality,
+				tone: safeBody.tone,
+				movieCharacter: safeBody.movieCharacter,
 			},
 			{
 				attempts: 2,

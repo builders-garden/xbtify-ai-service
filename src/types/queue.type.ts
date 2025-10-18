@@ -18,6 +18,15 @@ export type AgentInitJobData = {
 	movieCharacter: string;
 };
 
+export type AgentReinitJobData = {
+	fid: number;
+	deleteCasts: boolean;
+	deleteReplies: boolean;
+	personality: string;
+	tone: string;
+	movieCharacter: string;
+};
+
 const jobResultSuccessSchema = z.object({
 	status: z.literal("success"),
 	message: z.string(),

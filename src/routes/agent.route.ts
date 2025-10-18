@@ -9,9 +9,9 @@ import { getNegativeImageAndUpload } from "../lib/image.js";
 const router = express.Router();
 
 router.post("/init", initAgentController);
-router.post("/:id/reinitialize", reinitializeAgentController);
-router.post("/:id/ask", handleAskAgentController);
-router.get("/:id/info", initAgentController);
+router.post("/:fid/reinitialize", reinitializeAgentController);
+router.post("/:fid/ask", handleAskAgentController);
+router.get("/:fid/info", initAgentController);
 router.post("/image/negative", async (req, res) => {
 	try {
 		const { imageUrl, filename } = req.body;

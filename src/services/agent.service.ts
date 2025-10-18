@@ -154,11 +154,17 @@ export const reinitializeAgent = async ({
 	fid,
 	deleteCasts,
 	deleteReplies,
+	personality,
+	tone,
+	movieCharacter,
 }: {
 	fid: number;
 	deleteCasts: boolean;
 	deleteReplies: boolean;
-}) => {
+	personality: string;
+	tone: string;
+	movieCharacter: string;
+} & AgentInitJobData) => {
 	try {
 		// Farcaster casts
 		// step 1: delete all existing casts for the user
@@ -172,7 +178,6 @@ export const reinitializeAgent = async ({
 		let importedRepliesCount = 0;
 		let storedCasts: Cast[] = [];
 		let storedReplies: Reply[] = [];
-		console.log("storedReplies", storedReplies);
 		if (deleteCasts) {
 			deletedCastsCount = await deleteAllCastsByFid(fid);
 			console.log(
@@ -202,18 +207,19 @@ export const reinitializeAgent = async ({
     // step 3: generate style_profile_prompt base on casts and replies
     const castsText = JSON.stringify(storedCasts.map((cast) => ({ text: cast.text })));
     const repliesText = JSON.stringify(storedReplies.map((reply) => ({ parentText: reply.parentText, text: reply.text })));
-    const style_profile_prompt = await runInitAgent(castsText, repliesText);
-    console.log(`[agent.service]: generated style_profile_prompt base on casts and replies: ${style_profile_prompt}`);
+    const styleProfilePromptResult = await runInitAgent(castsText, repliesText);
+    console.log(`[agent.service]: generated style_profile_prompt base on casts and replies for fid ${fid}`);
 
     // step 4: update or create agent in database
-    await updateOrCreateAgent(fid, AgentStatus.REINITIALIZING, style_profile_prompt.response);
-
-		// step 4: update or create agent in database
-		await updateOrCreateAgent(
+    await updateOrCreateAgent({
 			fid,
-			AgentStatus.REINITIALIZING,
-			style_profile_prompt.response,
-		);
+			creatorFid: fid,
+			status: AgentStatus.READY,
+			styleProfilePrompt: styleProfilePromptResult.response,
+			personality,
+			tone,
+			movieCharacter,
+		});
 
 	return {
 			fid,
@@ -390,12 +396,21 @@ async function storeNewAgentInDb({
 	return newAgent;
 }
 
-async function updateOrCreateAgent(fid: number, status: AgentStatus, styleProfilePrompt: string) {
+async function updateOrCreateAgent(agentData: {
+	fid: number;
+	creatorFid: number;
+	status: AgentStatus;
+	styleProfilePrompt: string;
+	personality: string;
+	tone: string;
+	movieCharacter: string;
+	avatarUrl?: string;
+}): Promise<Agent> {
   // Check if agent already exists
-  const existingAgent = await getAgentByFid(fid);
+  const existingAgent = await getAgentByFid(agentData.fid);
 
   // parse styleProfilePrompt to JSON
-  const styleProfilePromptJson = JSON.parse(styleProfilePrompt);
+  const styleProfilePromptJson = JSON.parse(agentData.styleProfilePrompt);
 
   const patternsPerTopic = styleProfilePromptJson.patterns_per_topic;
   const keywords = Object.keys(styleProfilePromptJson.keywords);
@@ -405,25 +420,29 @@ async function updateOrCreateAgent(fid: number, status: AgentStatus, styleProfil
   if (existingAgent) {	
     // Update existing agent
     const updatedAgent = await updateAgent(existingAgent.id, {
-      status,
-      styleProfilePrompt,
+      status: agentData.status,
+      styleProfilePrompt: agentData.styleProfilePrompt,
       topicPatternsPrompt: patternsPerTopic,
       keywords: keywordsString,
     });
     console.log(
-      `[agent.service|${new Date().toISOString()}]: updated existing agent for fid ${fid} with status ${status}`
+      `[agent.service|${new Date().toISOString()}]: updated existing agent for fid ${agentData.fid} with status ${agentData.status}`
     );
     return updatedAgent;
   } else {
     // Create new agent
     const newAgent = await createAgent({
-      fid: fid,
-      creatorFid: fid,
-      status,
-      styleProfilePrompt,
+      fid: agentData.fid,
+      creatorFid: agentData.creatorFid,
+      status: agentData.status,
+      styleProfilePrompt: agentData.styleProfilePrompt,
+      personality: agentData.personality,
+      tone: agentData.tone,
+      movieCharacter: agentData.movieCharacter,
+      avatarUrl: agentData.avatarUrl,
     });
     console.log(
-      `[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`
+      `[agent.service|${new Date().toISOString()}]: created new agent for fid ${agentData.fid} with status ${agentData.status}`
     );
     return newAgent;
   }

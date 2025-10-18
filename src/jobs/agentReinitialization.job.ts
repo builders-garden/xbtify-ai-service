@@ -1,13 +1,8 @@
 import { reinitializeAgent } from "../services/agent.service.js";
-
-type AgentReinitializationOptions = {
-	fid: number;
-	deleteCasts: boolean;
-	deleteReplies: boolean;
-};
+import { AgentReinitJobData } from "../types/queue.type.js";
 
 export async function processAgentReinitialization(
-	agentReinitializationOptions: AgentReinitializationOptions,
+	agentReinitializationOptions: AgentReinitJobData,
 ) {
 	const { fid, importedCasts } = await reinitializeAgent(
 		agentReinitializationOptions,

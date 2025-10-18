@@ -76,7 +76,7 @@ export async function createAgent(agent: CreateAgent): Promise<Agent> {
 export async function updateAgent(
 	id: string,
 	updates: UpdateAgent,
-): Promise<Agent | undefined> {
+): Promise<Agent> {
 	const [updatedAgent] = await db
 		.update(agentTable)
 		.set({
