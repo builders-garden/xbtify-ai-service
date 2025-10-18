@@ -1,4 +1,4 @@
-# Farville Service
+# XBTify AI Service
 
 A Node.js TypeScript service implementing Express API and scheduled jobs using BullMQ.
 

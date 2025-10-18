@@ -1,19 +1,16 @@
 import dotenv from "dotenv";
 import type { Config } from "drizzle-kit";
+import { env } from "./src/config/env";
 
 dotenv.config({
-  path: ".env",
+	path: ".env",
 });
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not defined in environment variables");
-}
-
 export default {
-  schema: "./src/lib/database/db.schema.ts",
-  out: "./migrations",
-  dialect: "postgresql",
-  dbCredentials: {
-    url: process.env.DATABASE_URL!,
-  },
+	schema: "./src/lib/database/db.schema.ts",
+	out: "./migrations",
+	dialect: "postgresql",
+	dbCredentials: {
+		url: env.DATABASE_URL,
+	},
 } satisfies Config;

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "..";
-import { User, userTable } from "../db.schema.js";
+import { type User, userTable } from "../db.schema.js";
 
 /**
  * Get a user from their Farcaster fid
@@ -8,16 +8,16 @@ import { User, userTable } from "../db.schema.js";
  * @returns The user or null if the user is not found
  */
 export async function getUserFromFid(fid: number): Promise<User | null> {
-  if (fid < 0) {
-    return null;
-  }
+	if (fid < 0) {
+		return null;
+	}
 
-  const row = await db.query.userTable.findFirst({
-    where: eq(userTable.farcasterFid, fid),
-    with: {
-      wallets: true,
-    },
-  });
+	const row = await db.query.userTable.findFirst({
+		where: eq(userTable.farcasterFid, fid),
+		with: {
+			wallets: true,
+		},
+	});
 
-  return row ?? null;
+	return row ?? null;
 }

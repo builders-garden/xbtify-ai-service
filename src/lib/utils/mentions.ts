@@ -4,25 +4,26 @@
  * @returns Array of mention matches
  */
 export interface MentionMatch {
-  username: string;
-  startIndex: number;
-  endIndex: number;
+	username: string;
+	startIndex: number;
+	endIndex: number;
 }
 
 export function parseMentions(text: string): MentionMatch[] {
-  const mentionRegex = /@([\w-]+)/g;
-  const mentions: MentionMatch[] = [];
-  let match;
+	const mentionRegex = /@([\w-]+)/g;
+	const mentions: MentionMatch[] = [];
+	let match = mentionRegex.exec(text);
 
-  while ((match = mentionRegex.exec(text)) !== null) {
-    mentions.push({
-      username: match[1],
-      startIndex: match.index,
-      endIndex: match.index + match[0].length,
-    });
-  }
+	while (match !== null) {
+		mentions.push({
+			username: match[1],
+			startIndex: match.index,
+			endIndex: match.index + match[0].length,
+		});
+		match = mentionRegex.exec(text);
+	}
 
-  return mentions;
+	return mentions;
 }
 
 /**
@@ -32,10 +33,10 @@ export function parseMentions(text: string): MentionMatch[] {
  * @returns Whether the user is mentioned
  */
 export function isUserMentioned(text: string, username: string): boolean {
-  const mentions = parseMentions(text);
-  return mentions.some(
-    (mention) => mention.username.toLowerCase() === username.toLowerCase()
-  );
+	const mentions = parseMentions(text);
+	return mentions.some(
+		(mention) => mention.username.toLowerCase() === username.toLowerCase(),
+	);
 }
 
 /**
@@ -44,6 +45,6 @@ export function isUserMentioned(text: string, username: string): boolean {
  * @returns Array of unique usernames
  */
 export function getMentionedUsernames(text: string): string[] {
-  const mentions = parseMentions(text);
-  return [...new Set(mentions.map((mention) => mention.username))];
+	const mentions = parseMentions(text);
+	return [...new Set(mentions.map((mention) => mention.username))];
 }

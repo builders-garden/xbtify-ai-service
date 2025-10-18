@@ -3,14 +3,15 @@ PORT=3000
 NODE_ENV=development
 
 # Database Configuration
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/farville?schema=public"
-DIRECT_URL="postgresql://postgres:postgres@localhost:5432/farville?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/db?schema=public"
+DIRECT_URL="postgresql://postgres:postgres@localhost:5432/db?schema=public"
 
 # Redis Configuration (for BullMQ)
 REDIS_URL="your_redis_url_here"
 
 # Neynar API Configuration
-NEYNAR_API_KEY=your_neynar_api_key_here
+NEYNAR_API_KEY="your_neynar_api_key_here"
+NEYNAR_WEBHOOK_SECRET="123"
 
 # Application URL (for notifications)
 APP_URL=http://localhost:3000
