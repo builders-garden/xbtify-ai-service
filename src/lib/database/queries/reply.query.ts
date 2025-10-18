@@ -1,7 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import {
-	type Reply,
 	type CreateReply,
+	type Reply,
 	replyTable,
 	type UpdateReply,
 } from "../db.schema.js";

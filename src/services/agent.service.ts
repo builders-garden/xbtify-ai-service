@@ -1,12 +1,19 @@
+import { runInitAgent } from "../lib/agent/init_agent.js";
 import type { Agent } from "../lib/database/db.schema.js";
-import { createAgent } from "../lib/database/queries/agent.query.js";
+import {
+	createAgent,
+	getAgentByFid,
+	updateAgent,
+} from "../lib/database/queries/agent.query.js";
 import {
 	createCasts,
 	deleteAllCastsByFid,
+	getCastsByFid,
 } from "../lib/database/queries/cast.query.js";
 import {
 	createReplies,
 	deleteAllRepliesByFid,
+	getRepliesByFid,
 } from "../lib/database/queries/reply.query.js";
 import {
 	fetchUserCasts,
@@ -26,10 +33,20 @@ export const initAgent = async ({ fid }: { fid: number }) => {
 	try {
 		// doing something here
 		console.log("[agent.service]: initAgent called");
+		// step 1: fetch and store fresh casts
+		const { casts, count } = await fetchAndStoreFarcasterCasts(fid);
 
-		const { count } = await fetchAndStoreFarcasterCasts(fid);
+		// step 2: generate style_profile_prompt base on casts
+		const style_profile_prompt = await runInitAgent(
+			casts.map((cast) => cast.text).join("\n"),
+		);
 
-		await storeNewAgentInDb(fid, AgentStatus.INITIALIZING);
+		// step 3: store agent in database
+		await storeNewAgentInDb(
+			fid,
+			AgentStatus.INITIALIZING,
+			style_profile_prompt.response,
+		);
 
 		return {
 			fid,
@@ -41,7 +58,15 @@ export const initAgent = async ({ fid }: { fid: number }) => {
 	}
 };
 
-export const reinitializeAgent = async ({ fid, deleteCasts, deleteReplies }: { fid: number, deleteCasts: boolean, deleteReplies: boolean }) => {
+export const reinitializeAgent = async ({
+	fid,
+	deleteCasts,
+	deleteReplies,
+}: {
+	fid: number;
+	deleteCasts: boolean;
+	deleteReplies: boolean;
+}) => {
 	try {
 		// Farcaster casts
 		// step 1: delete all existing casts for the user
@@ -49,34 +74,58 @@ export const reinitializeAgent = async ({ fid, deleteCasts, deleteReplies }: { f
 			`[agent.service|${new Date().toISOString()}]: reinitializing agent for fid ${fid}, deleteCasts=${deleteCasts}, deleteReplies=${deleteReplies}`,
 		);
 
-    let deletedCastsCount = 0;
-    let deletedRepliesCount = 0;
-    let importedCastsCount = 0;
-    let importedRepliesCount = 0;
-    if (deleteCasts) {
-      deletedCastsCount = await deleteAllCastsByFid(fid);
-      console.log(
-        `[agent.service|${new Date().toISOString()}]: deleted ${deletedCastsCount} existing casts for fid ${fid}`,
-      );
-      // step 2: fetch and store fresh casts
-		  const { count } = await fetchAndStoreFarcasterCasts(fid);
-      importedCastsCount = count;
-    }
+		let deletedCastsCount = 0;
+		let deletedRepliesCount = 0;
+		let importedCastsCount = 0;
+		let importedRepliesCount = 0;
+		let storedCasts = [];
+		// biome-ignore lint/correctness/noUnusedVariables: need here
+		let storedReplies = [];
+		if (deleteCasts) {
+			deletedCastsCount = await deleteAllCastsByFid(fid);
+			console.log(
+				`[agent.service|${new Date().toISOString()}]: deleted ${deletedCastsCount} existing casts for fid ${fid}`,
+			);
+			// step 2: fetch and store fresh casts
+			const { casts, count } = await fetchAndStoreFarcasterCasts(fid);
+			storedCasts = casts;
+			importedCastsCount = count;
+		} else {
+			storedCasts = await getCastsByFid(fid);
+		}
 
-    if (deleteReplies) {
-      deletedRepliesCount = await deleteAllRepliesByFid(fid);
-      console.log(
-        `[agent.service|${new Date().toISOString()}]: deleted ${deletedRepliesCount} existing replies for fid ${fid}`,
-      );
-      // step 3: fetch and store fresh replies
-    const { count } = await fetchAndStoreFarcasterReplies(fid);
-    importedRepliesCount = count;
-    }
+		if (deleteReplies) {
+			deletedRepliesCount = await deleteAllRepliesByFid(fid);
+			console.log(
+				`[agent.service|${new Date().toISOString()}]: deleted ${deletedRepliesCount} existing replies for fid ${fid}`,
+			);
+			// step 3: fetch and store fresh replies
+			const { replies, count } = await fetchAndStoreFarcasterReplies(fid);
+			storedReplies = replies;
+			importedRepliesCount = count;
+		} else {
+			storedReplies = await getRepliesByFid(fid);
+		}
+
+		// step 3: generate style_profile_prompt base on casts
+		const style_profile_prompt = await runInitAgent(
+			storedCasts.map((cast) => cast.text).join("\n"),
+		);
+		console.log(
+			`[agent.service]: generated style_profile_prompt base on casts: ${style_profile_prompt}`,
+		);
+
+		// step 4: update or create agent in database
+		await updateOrCreateAgent(
+			fid,
+			AgentStatus.REINITIALIZING,
+			style_profile_prompt.response,
+		);
 
 		return {
 			fid,
 			deletedCasts: deletedCastsCount,
-      deletedReplies: deletedRepliesCount,
+			deletedReplies: deletedRepliesCount,
 			importedCasts: importedCastsCount,
 			importedReplies: importedRepliesCount,
 		};
@@ -150,14 +199,14 @@ async function fetchAndStoreFarcasterReplies(fid: number) {
 		`[agent.service|${new Date().toISOString()}]: fetched ${replies.length} replies`,
 	);
 
-  // step 2: filter replies by length (just > 0 so we have some text)
-  const filteredReplies = filterRepliesByLength(replies, 0);
-  console.log(
-    `[agent.service|${new Date().toISOString()}]: filtered to ${
-      filteredReplies.length
-    } replies (min length: 0)`,
-  );
-	
+	// step 2: filter replies by length (just > 0 so we have some text)
+	const filteredReplies = filterRepliesByLength(replies, 0);
+	console.log(
+		`[agent.service|${new Date().toISOString()}]: filtered to ${
+			filteredReplies.length
+		} replies (min length: 0)`,
+	);
+
 	// step 3: extract reply data for database
 	const extractedData = extractRepliesDataForDb(filteredReplies);
 	console.log(
@@ -165,7 +214,7 @@ async function fetchAndStoreFarcasterReplies(fid: number) {
 			extractedData.length
 		} replies for db`,
 	);
-	
+
 	// step 4: save replies to database
 	await createReplies(extractedData);
 	console.log(
@@ -179,15 +228,52 @@ async function fetchAndStoreFarcasterReplies(fid: number) {
 	};
 }
 
-async function storeNewAgentInDb(fid: number, status: AgentStatus) {
+async function storeNewAgentInDb(
+	fid: number,
+	status: AgentStatus,
+	styleProfilePrompt: string,
+) {
 	const newAgent = await createAgent({
-		fid: 1,
+		fid: fid,
 		creatorFid: fid,
 		status,
+		styleProfilePrompt,
 	});
 	console.log(
 		`[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`,
 	);
 
+	return newAgent;
+}
+
+async function updateOrCreateAgent(
+	fid: number,
+	status: AgentStatus,
+	styleProfilePrompt: string,
+) {
+	// Check if agent already exists
+	const existingAgent = await getAgentByFid(fid);
+
+	if (existingAgent) {
+		// Update existing agent
+		const updatedAgent = await updateAgent(existingAgent.id, {
+			status,
+			styleProfilePrompt,
+		});
+		console.log(
+			`[agent.service|${new Date().toISOString()}]: updated existing agent for fid ${fid} with status ${status}`,
+		);
+		return updatedAgent;
+	}
+	// Create new agent
+	const newAgent = await createAgent({
+		fid: fid,
+		creatorFid: fid,
+		status,
+		styleProfilePrompt,
+	});
+	console.log(
+		`[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`,
+	);
 	return newAgent;
 }
