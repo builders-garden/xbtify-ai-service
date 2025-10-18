@@ -13,6 +13,9 @@ const envSchema = z.object({
 		.enum(["development", "production", "test"])
 		.default("development"),
 
+	// Backend URL
+	BACKEND_URL: z.string().url(),
+
 	// API Security
 	API_SECRET_KEY: z
 		.string()
@@ -42,6 +45,11 @@ const envSchema = z.object({
 		.string()
 		.transform((val) => val === "true")
 		.default("false"),
+
+	// Langfuse Agent tracking
+	LANGFUSE_SECRET_KEY: z.string().min(1),
+	LANGFUSE_PUBLIC_KEY: z.string().min(1),
+	LANGFUSE_BASE_URL: z.string().url(),
 });
 
 export type Env = z.infer<typeof envSchema>;

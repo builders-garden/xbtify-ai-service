@@ -133,6 +133,8 @@ export const agentTable = pgTable(
 		avatarUrl: text("avatar_url"),
 		address: text("address"),
 		privateKey: text("private_key"),
+		mnemonic: text("mnemonic"),
+		signerUuid: text("signer_uuid"),
 
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at")

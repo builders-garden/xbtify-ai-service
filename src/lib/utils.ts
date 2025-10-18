@@ -17,3 +17,19 @@ export function getWeekNumber(date: Date): number {
 
 	return weekNumber;
 }
+
+/**
+ * Replace all non-alphanumeric characters with an empty string
+ * @param username
+ */
+export function getCleanFarcasterUsername(username: string): string {
+	let clean = username;
+	if (username.endsWith(".base.eth")) {
+		clean = username.replace(".base.eth", "");
+	} else if (username.endsWith(".eth")) {
+		clean = username.replace(".eth", "");
+	} else if (username.endsWith(".sol")) {
+		clean = username.replace(".sol", "");
+	}
+	return clean.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+}

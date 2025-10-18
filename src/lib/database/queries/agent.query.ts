@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import {
 	type Agent,
 	agentTable,
@@ -17,6 +17,34 @@ export async function getAgentByFid(fid: number): Promise<Agent | undefined> {
 		.where(eq(agentTable.fid, fid))
 		.limit(1);
 	return agent;
+}
+
+/**
+ * Get agent by FID or creator FID
+ * @param fid - The FID of the agent
+ * @param creatorFid - The creator FID of the agent
+ * @returns
+ */
+export async function getAgentByCreatorFidOrFid(
+	fid: number,
+): Promise<Agent | undefined> {
+	const agent = await db.query.agentTable.findFirst({
+		where: or(eq(agentTable.fid, fid), eq(agentTable.creatorFid, fid)),
+	});
+	return agent;
+}
+
+/**
+ * Get all agent FIDs
+ * @returns All agent FIDs
+ */
+export async function getAllAgentsFids(): Promise<number[]> {
+	const fids = await db.query.agentTable.findMany({
+		columns: {
+			fid: true,
+		},
+	});
+	return fids.map((row) => row.fid);
 }
 
 /**

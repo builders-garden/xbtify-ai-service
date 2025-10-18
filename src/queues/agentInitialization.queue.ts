@@ -1,8 +1,9 @@
 import { Queue } from "bullmq";
 import { redisConnection } from "../lib/redis.js";
 import { QueueName } from "../types/enums.js";
+import type { AgentInitJobData } from "../types/queue.type.js";
 
-export const agentInitializationQueue = new Queue(
+export const agentInitializationQueue = new Queue<AgentInitJobData>(
 	QueueName.AGENT_INITIALIZATION,
 	{
 		connection: redisConnection,

@@ -1,9 +1,10 @@
 import type { Job } from "bullmq";
-import type { Hex } from "viem";
-import { getAgentByFid } from "../lib/database/queries/agent.query.js";
+import { v4 as uuidv4 } from "uuid";
+import { getAgentByCreatorFidOrFid } from "../lib/database/queries/agent.query.js";
 import {
-	sendMessageToUserViaNeynar,
-	sendMessageToUserViaNeynarRaw,
+	// sendMessageToUserViaNeynar,
+	// sendMessageToUserViaNeynarRaw,
+	postCastToFarcaster,
 } from "../lib/neynar.js";
 import { handleAskAgent } from "../services/agent.service.js";
 import type { JobResult, NeynarWebhookJobData } from "../types/queue.type.js";
@@ -28,17 +29,32 @@ export async function processNeynarWebhookJob(
 
 	// process each mentioned fid
 	for (const fid of mentionedFids) {
-		const agent = await getAgentByFid(fid);
+		const agent = await getAgentByCreatorFidOrFid(fid);
+		// no bot found
 		if (!agent) {
 			console.warn(
 				`[neynar-webhook-job] Agent not found for mentioned fid ${fid}`,
 			);
+			progress += increment;
+			await job.updateProgress(progress);
 			continue;
 		}
-		if (!agent.privateKey) {
-			console.warn(
-				`[neynar-webhook-job] Agent ${agent.fid} has no private key`,
+		// the bot should not respond to its own cast
+		if (agent.fid === cast.authorFid) {
+			console.log(
+				`[neynar-webhook-job] Agent ${agent.fid} is the same as the author of the cast, skipping`,
 			);
+			progress += increment;
+			await job.updateProgress(progress);
+			continue;
+		}
+		// the bot should have a signer uuid to post a cast
+		if (!agent.signerUuid) {
+			console.warn(
+				`[neynar-webhook-job] Agent ${agent.fid} has no signer uuid`,
+			);
+			progress += increment;
+			await job.updateProgress(progress);
 			continue;
 		}
 		const question = cast.text;
@@ -50,27 +66,17 @@ export async function processNeynarWebhookJob(
 			`[neynar-webhook-job] Response for fid ${fid} ${response.answer}`,
 		);
 
-		const message = await sendMessageToUserViaNeynar({
-			agentFid: agent.fid,
-			agentPrivateKey: agent.privateKey as Hex,
+		const newCast = await postCastToFarcaster({
+			signerUuid: agent.signerUuid,
+			text: response.answer,
+			embeds: [],
+			parentHash: cast.hash,
+			idempotencyKey: uuidv4(),
 			authorFid: cast.authorFid,
-			message: `[1.] ${response.answer}`,
-			parentCastUrl: cast.url,
 		});
 		console.log(
-			"[neynar-webhook-job] 1. message posted to farcaster",
-			JSON.stringify(message, null, 2),
-		);
-		const messageRaw = await sendMessageToUserViaNeynarRaw({
-			agentFid: agent.fid,
-			agentPrivateKey: agent.privateKey as Hex,
-			authorFid: cast.authorFid,
-			message: `[2.] ${response.answer}`,
-			parentCastUrl: cast.url,
-		});
-		console.log(
-			"[neynar-webhook-job] 2. message raw posted to farcaster ",
-			JSON.stringify(messageRaw, null, 2),
+			"new cast posted to farcaster",
+			JSON.stringify(newCast, null, 2),
 		);
 
 		progress += increment;

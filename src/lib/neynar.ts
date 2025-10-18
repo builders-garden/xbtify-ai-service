@@ -1,15 +1,5 @@
-import {
-	CastType,
-	FarcasterNetwork,
-	makeCastAdd,
-	NobleEd25519Signer,
-	ViemWalletEip712Signer,
-} from "@farcaster/hub-nodejs";
 import { Configuration, NeynarAPIClient } from "@neynar/nodejs-sdk";
 import ky from "ky";
-import { createWalletClient, type Hex, http } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { optimism } from "viem/chains";
 import { env } from "../config/env.js";
 import type { NeynarCast, NeynarUser, NeynarWebhook } from "../types/neynar.js";
 
@@ -43,6 +33,41 @@ type NeynarFetchBulkCastsResponse = {
 	result: {
 		casts: NeynarCast[];
 	};
+};
+
+/**
+ * Fetch multiple users from Neynar
+ * @param fids - comma separated FIDs of the users to fetch
+ * @returns The users
+ */
+export const fetchBulkUsersFromNeynar = async (
+	fids: number[],
+	viewerFid?: number,
+) => {
+	if (!fids) {
+		return [];
+	}
+
+	const data = await neynarClient.fetchBulkUsers({
+		fids,
+		viewerFid,
+	});
+
+	return data.users || [];
+};
+
+/**
+ * Fetch a single user from Neynar
+ * @param fid - The FID of the user to fetch
+ * @returns The user
+ */
+export const fetchUserFromNeynarByFid = async (fid: number) => {
+	if (!fid) {
+		return null;
+	}
+	const users = await fetchBulkUsersFromNeynar([fid]);
+	if (!users || users.length === 0) return null;
+	return users[0];
 };
 
 export const fetchUserCasts = async ({
@@ -335,101 +360,127 @@ export const updateNeynarWebhookCastCreated = async ({
 };
 
 /**
- * Send a message to a user via Neynar
- * @param agentFid - The FID of the agent
- * @param agentPrivateKey - The private key of the agent
- * @param authorFid - The FID of the author
- * @param message - The message to send
- * @param parentCastUrl - The URL of the parent cast
- * @returns
+ * Fetch a fresh FID from Neynar for account creation
+ * @returns The FID
  */
-export const sendMessageToUserViaNeynar = async ({
-	agentFid,
-	agentPrivateKey,
-	authorFid,
-	message,
-	parentCastUrl,
-}: {
-	agentFid: number;
-	agentPrivateKey: Hex;
-	authorFid: number;
-	message: string;
-	parentCastUrl: string;
-}) => {
-	const client = createWalletClient({
-		account: privateKeyToAccount(agentPrivateKey),
-		chain: optimism,
-		transport: http(),
-	});
-	const signer = new ViemWalletEip712Signer(client);
-	const dataOptions = {
-		fid: agentFid,
-		network: FarcasterNetwork.MAINNET,
+export const fetchFreshFid = async (): Promise<number> => {
+	const fidResponse = await ky
+		.get<{ fid: number }>("https://api.neynar.com/v2/farcaster/user/fid", {
+			headers: {
+				"x-api-key": env.NEYNAR_API_KEY,
+			},
+		})
+		.json();
+
+	return fidResponse.fid;
+};
+
+/**
+ * Check if a Farcaster username is available
+ * @param fname - The username to check
+ * @returns Whether the username is available
+ */
+export const checkFnameAvailability = async (
+	fname: string,
+): Promise<boolean> => {
+	const response = await ky
+		.get<{ available: boolean }>(
+			"https://api.neynar.com/v2/farcaster/fname/availability",
+			{
+				searchParams: { fname },
+				headers: {
+					"x-api-key": env.NEYNAR_API_KEY,
+				},
+			},
+		)
+		.json();
+
+	return response.available;
+};
+
+/**
+ * Register a new Farcaster account with Neynar
+ * @param params - The registration parameters
+ * @returns The registration response
+ */
+export const registerFarcasterAccount = async (params: {
+	fid: number;
+	signature: string;
+	custodyAddress: string;
+	deadline: number;
+	fname: string;
+	metadata: {
+		bio: string;
+		pfp_url: string;
+		url: string;
+		display_name: string;
 	};
-	const castData = await makeCastAdd(
+}): Promise<{ success: boolean }> => {
+	const registerResponse = await fetch(
+		"https://api.neynar.com/v2/farcaster/user",
 		{
-			text: message,
-			embeds: [],
-			embedsDeprecated: [],
-			mentions: [authorFid],
-			mentionsPositions: [],
-			parentUrl: parentCastUrl,
-			type: CastType.CAST,
+			method: "POST",
+			headers: {
+				"x-api-key": env.NEYNAR_API_KEY,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				fid: params.fid,
+				signature: params.signature,
+				// requestedUserCustodyAddress: params.custodyAddress,
+				requested_user_custody_address: params.custodyAddress,
+				deadline: params.deadline,
+				fname: params.fname,
+				metadata: params.metadata,
+			}),
 		},
-		dataOptions,
-		signer,
 	);
-	const data = await neynarClient.publishMessageToFarcaster({
-		body: castData,
-	});
-	console.log("neynarClient.sendMessage", JSON.stringify(data, null, 2));
+
+	if (!registerResponse.ok) {
+		const errorData = await registerResponse.json();
+		throw new Error(
+			`Failed to register Farcaster account on Neynar: ${JSON.stringify(
+				errorData,
+			)}`,
+		);
+	}
+
+	const data = (await registerResponse.json()) as { success: boolean };
 	return data;
 };
 
 /**
- * Send a message to a user via Neynar
- * @param agentFid - The FID of the agent
- * @param agentPrivateKey - The private key of the agent
+ * Post a cast to Farcaster using Neynar
+ * @param signerUuid - The UUID of the signer
+ * @param text - The text of the cast
+ * @param embeds - The embeds of the cast
+ * @param parentHash - The hash of the parent cast
+ * @param idempotencyKey - The idempotency key
  * @param authorFid - The FID of the author
- * @param message - The message to send
- * @param parentCastUrl - The URL of the parent cast
- * @returns
+ * @returns The cast
  */
-export const sendMessageToUserViaNeynarRaw = async ({
-	agentFid,
-	agentPrivateKey,
+export const postCastToFarcaster = async ({
+	signerUuid,
+	text,
+	embeds,
+	parentHash,
+	idempotencyKey,
 	authorFid,
-	message,
-	parentCastUrl,
 }: {
-	agentFid: number;
-	agentPrivateKey: Hex;
+	signerUuid: string;
+	text: string;
+	embeds?: string[];
+	idempotencyKey: string;
+	parentHash: string;
 	authorFid: number;
-	message: string;
-	parentCastUrl: string;
 }) => {
-	const privateKey = Uint8Array.from(Buffer.from(agentPrivateKey, "hex"));
-	const ed25519Signer = new NobleEd25519Signer(privateKey);
-	const dataOptions = {
-		fid: agentFid,
-		network: FarcasterNetwork.MAINNET,
-	};
-	const castData = await makeCastAdd(
-		{
-			text: message,
-			embeds: [],
-			embedsDeprecated: [],
-			mentions: [authorFid],
-			mentionsPositions: [],
-			parentUrl: parentCastUrl,
-			type: CastType.CAST,
-		},
-		dataOptions,
-		ed25519Signer,
-	);
-	const data = await neynarClient.publishMessageToFarcaster({
-		body: castData,
+	const data = await neynarClient.publishCast({
+		signerUuid,
+		text,
+		idem: idempotencyKey,
+		parent: parentHash,
+		parentAuthorFid: authorFid,
+		embeds: embeds?.map((embed) => ({ url: embed })),
 	});
-	console.log("neynarClient.sendMessage", JSON.stringify(data, null, 2));
 	return data;
 };

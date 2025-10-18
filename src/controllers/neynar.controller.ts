@@ -33,10 +33,11 @@ export const neynarWebhookController = async (req: Request, res: Response) => {
 			`process-${QueueName.NEYNAR_WEBHOOK}`,
 			{
 				cast: {
+					hash: cast.hash,
 					text: cast.text,
 					authorFid: cast.author.fid,
 					createdAt: new Date(createdAt),
-					mentionedFids: mentionedFids,
+					mentionedFids,
 					url: `https://farcaster.xyz/${cast.author.username}/${cast.hash}`,
 				},
 			},

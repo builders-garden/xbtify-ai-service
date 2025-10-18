@@ -11,6 +11,9 @@ import { AgentStatus, QueueName } from "../types/enums.js";
 
 const initSchema = z.object({
 	fid: z.number().int().positive().min(1),
+	personality: z.string().min(1),
+	tone: z.string().min(1),
+	movieCharacter: z.string().min(1),
 	reinitialize: z.boolean().optional().default(false),
 });
 
@@ -31,9 +34,12 @@ export const initAgentController = async (req: Request, res: Response) => {
 			QueueName.AGENT_INITIALIZATION,
 			{
 				fid: safeBody.fid,
+				personality: safeBody.personality,
+				tone: safeBody.tone,
+				movieCharacter: safeBody.movieCharacter,
 			},
 			{
-				attempts: 2,
+				attempts: 1,
 				removeOnComplete: true,
 			},
 		);

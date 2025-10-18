@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export interface NeynarWebhookJobData {
 	cast: {
+		hash: string;
 		text: string;
 		authorFid: number;
 		createdAt: Date;
@@ -9,6 +10,13 @@ export interface NeynarWebhookJobData {
 		url: string;
 	};
 }
+
+export type AgentInitJobData = {
+	fid: number;
+	personality: string;
+	tone: string;
+	movieCharacter: string;
+};
 
 const jobResultSuccessSchema = z.object({
 	status: z.literal("success"),

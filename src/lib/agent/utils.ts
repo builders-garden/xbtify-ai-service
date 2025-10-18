@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "node:fs";
 
 // Helper function to extract JSON from response text
 export function extractJSON(text: string): string | null {

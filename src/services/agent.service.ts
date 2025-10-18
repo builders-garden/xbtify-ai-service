@@ -1,8 +1,10 @@
+import { env } from "../config/env.js";
 import { runInitAgent } from "../lib/agent/init_agent.js";
-import type { Agent } from "../lib/database/db.schema.js";
+import type { Agent, Cast, Reply } from "../lib/database/db.schema.js";
 import {
 	createAgent,
 	getAgentByFid,
+	getAllAgentsFids,
 	updateAgent,
 } from "../lib/database/queries/agent.query.js";
 import {
@@ -15,9 +17,12 @@ import {
 	deleteAllRepliesByFid,
 	getRepliesByFid,
 } from "../lib/database/queries/reply.query.js";
+import { createFarcasterAccount } from "../lib/farcaster.js";
 import {
 	fetchUserCasts,
+	fetchUserFromNeynarByFid,
 	fetchUserRepliesWithParentCast,
+	updateNeynarWebhookCastCreated,
 } from "../lib/neynar.js";
 import {
 	extractCastsDataForDb,
@@ -25,31 +30,101 @@ import {
 	filterCastsByLength,
 	filterRepliesByLength,
 } from "../lib/utils/agent.js";
+import { getCleanFarcasterUsername } from "../lib/utils.js";
 import { AgentStatus } from "../types/enums.js";
+import type { AgentInitJobData } from "../types/queue.type.js";
 
 const minLength = 30;
 
-export const initAgent = async ({ fid }: { fid: number }) => {
+export const initAgent = async (data: AgentInitJobData) => {
 	try {
-		// doing something here
 		console.log("[agent.service]: initAgent called");
-		// step 1: fetch and store fresh casts
-		const { casts, count } = await fetchAndStoreFarcasterCasts(fid);
 
-		// step 2: generate style_profile_prompt base on casts
+		// step 0. get farcaster user
+		const farcasterUser = await fetchUserFromNeynarByFid(data.fid);
+		if (!farcasterUser) {
+			throw new Error(`Farcaster user not found for fid ${data.fid}`);
+		}
+
+		const newFname = `${getCleanFarcasterUsername(farcasterUser.username)}xbt`;
+		const newDisplayName = `${farcasterUser.display_name ?? farcasterUser.username} XBT`;
+		// TODO convert add negative filter to pfp and store in s3
+		const pfpUrl = farcasterUser.pfp_url; //? await stylizeImage(farcasterUser.pfp_url) : undefined;
+
+		// step 1: create farcaster user
+		const farcasterAccount = await createFarcasterAccount({
+			fname: newFname,
+			displayName: newDisplayName,
+			bio: `digital twin of @${farcasterUser.username}`,
+			pfpUrl: pfpUrl,
+			url: `https://xbtify.vercel.app/${farcasterUser.fid}`,
+		});
+		console.log("Farcaster account created:", {
+			fid: farcasterAccount.fid,
+			fname: farcasterAccount.fname,
+			custodyAddress: farcasterAccount.custodyAddress,
+		});
+
+		// step 1.b: update neynar webhook
+		const allFids = await getAllAgentsFids();
+		// use set to avoid duplicates
+		const allFidsSet = new Set([...allFids, data.fid]);
+
+		await updateNeynarWebhookCastCreated({
+			webhookId: env.NEYNAR_WEBHOOK_ID,
+			webhookUrl: `${env.BACKEND_URL}/api/v1/neynar/webhooks`,
+			webhookName: "XBTify webhook",
+			fids: Array.from(allFidsSet),
+		});
+
+		// step 2: store agent in database
+		const agent = await storeNewAgentInDb({
+			fid: farcasterAccount.fid,
+			creatorFid: data.fid,
+			status: AgentStatus.INITIALIZING,
+			personality: data.personality,
+			tone: data.tone,
+			movieCharacter: data.movieCharacter,
+			username: newFname,
+			displayName: newDisplayName,
+			custodyAddress: farcasterAccount.custodyAddress,
+			mnemonic: farcasterAccount.mnemonic,
+			avatarUrl: pfpUrl,
+		});
+		console.log(`Agent stored in database:${agent.id}`);
+
+		// step 3: fetch and store fresh casts
+		// const { casts, count } = await fetchAndStoreFarcasterCasts(data.fid);
+		const casts = await getCastsByFid(data.fid);
+		const count = casts.length;
+
+		// step 4. get replies
+		// const { replies, count: repliesCount } = await fetchAndStoreFarcasterReplies(data.fid);
+
+		// step 5: generate style_profile_prompt base on casts
 		const style_profile_prompt = await runInitAgent(
 			casts.map((cast) => cast.text).join("\n"),
 		);
 
-		// step 3: store agent in database
-		await storeNewAgentInDb(
-			fid,
-			AgentStatus.INITIALIZING,
-			style_profile_prompt.response,
-		);
+		// step 6: update style_profile_prompt for agent
+		const updatedAgent = await updateAgent(agent.id, {
+			status: AgentStatus.READY,
+			styleProfilePrompt: style_profile_prompt.response,
+		});
+		console.log(`Agent updated:${updatedAgent?.id}`);
 
 		return {
-			fid,
+			fid: data.fid,
+			agent: {
+				id: updatedAgent?.id,
+				fid: updatedAgent?.fid,
+				username: updatedAgent?.username,
+				creatorFid: updatedAgent?.creatorFid,
+				status: updatedAgent?.status,
+				personality: updatedAgent?.personality,
+				tone: updatedAgent?.tone,
+				movieCharacter: updatedAgent?.movieCharacter,
+			},
 			importedCasts: count,
 		};
 	} catch (error) {
@@ -78,9 +153,9 @@ export const reinitializeAgent = async ({
 		let deletedRepliesCount = 0;
 		let importedCastsCount = 0;
 		let importedRepliesCount = 0;
-		let storedCasts = [];
-		// biome-ignore lint/correctness/noUnusedVariables: need here
-		let storedReplies = [];
+		let storedCasts: Cast[] = [];
+		let storedReplies: Reply[] = [];
+		console.log("storedReplies", storedReplies);
 		if (deleteCasts) {
 			deletedCastsCount = await deleteAllCastsByFid(fid);
 			console.log(
@@ -228,16 +303,46 @@ async function fetchAndStoreFarcasterReplies(fid: number) {
 	};
 }
 
-async function storeNewAgentInDb(
-	fid: number,
-	status: AgentStatus,
-	styleProfilePrompt: string,
-) {
+async function storeNewAgentInDb({
+	fid,
+	creatorFid,
+	status,
+	styleProfilePrompt,
+	personality,
+	tone,
+	movieCharacter,
+	username,
+	displayName,
+	custodyAddress,
+	mnemonic,
+	avatarUrl,
+}: {
+	fid: number;
+	creatorFid: number;
+	status: AgentStatus;
+	styleProfilePrompt?: string;
+	personality: string;
+	tone: string;
+	movieCharacter: string;
+	username: string;
+	displayName: string;
+	custodyAddress: string;
+	mnemonic: string;
+	avatarUrl?: string;
+}) {
 	const newAgent = await createAgent({
-		fid: fid,
-		creatorFid: fid,
+		fid,
+		creatorFid,
 		status,
 		styleProfilePrompt,
+		personality,
+		tone,
+		movieCharacter,
+		username,
+		displayName,
+		avatarUrl,
+		address: custodyAddress,
+		mnemonic,
 	});
 	console.log(
 		`[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`,
