@@ -1,8 +1,8 @@
 import express from "express";
 import {
-  handleAskAgentController,
-  initAgentController,
-  reinitializeAgentController,
+	handleAskAgentController,
+	initAgentController,
+	reinitializeAgentController,
 } from "../controllers/agent.controller.js";
 
 const router = express.Router();

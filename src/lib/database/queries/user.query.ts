@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db } from "..";
 import { type User, userTable } from "../db.schema.js";
+import { db } from "../index.js";
 
 /**
  * Get a user from their Farcaster fid

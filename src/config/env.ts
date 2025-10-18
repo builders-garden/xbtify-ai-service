@@ -27,6 +27,7 @@ const envSchema = z.object({
 
 	// Neynar
 	NEYNAR_API_KEY: z.string().min(1),
+	NEYNAR_WEBHOOK_ID: z.string().min(1),
 	NEYNAR_WEBHOOK_SECRET: z.string().min(1),
 
 	// Application

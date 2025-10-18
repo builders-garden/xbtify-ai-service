@@ -1,11 +1,12 @@
 import { Worker } from "bullmq";
 import { processAgentInitialization } from "../jobs/agentInitialization.job.js";
 import { redisConnection } from "../lib/redis.js";
+import { QueueName } from "../types/enums.js";
 
 export const agentInitializationWorker = new Worker(
-	"agent-initialization",
+	QueueName.AGENT_INITIALIZATION,
 	async (job) => {
-		console.log(`Processing re-initialization agent job #${job.id}`);
+		console.log(`Processing initialization agent job #${job.id}`);
 		try {
 			const result = await processAgentInitialization(job.data); // use job.data to pass parameters
 			return result;

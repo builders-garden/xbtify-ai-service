@@ -11,7 +11,8 @@ REDIS_URL="your_redis_url_here"
 
 # Neynar API Configuration
 NEYNAR_API_KEY="your_neynar_api_key_here"
-NEYNAR_WEBHOOK_SECRET="123"
+NEYNAR_WEBHOOK_ID="123"
+NEYNAR_WEBHOOK_SECRET="456"
 
 # Application URL (for notifications)
 APP_URL=http://localhost:3000

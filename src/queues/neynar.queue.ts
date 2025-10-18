@@ -1,9 +1,10 @@
 import { Queue } from "bullmq";
 import { redisConnection } from "../lib/redis.js";
 import { QueueName } from "../types/enums.js";
+import type { NeynarWebhookJobData } from "../types/queue.type.js";
 
-export const agentReinitializationQueue = new Queue(
-	QueueName.AGENT_REINITIALIZATION,
+export const neynarWebhookQueue = new Queue<NeynarWebhookJobData>(
+	QueueName.NEYNAR_WEBHOOK,
 	{
 		connection: redisConnection,
 		defaultJobOptions: {
