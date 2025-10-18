@@ -1,8 +1,11 @@
 import { eq, or } from "drizzle-orm";
 import {
 	type Agent,
+	type AgentCast,
+	agentCastTable,
 	agentTable,
 	type CreateAgent,
+	type CreateAgentCast,
 	type UpdateAgent,
 } from "../db.schema.js";
 import { db } from "../index.js";
@@ -83,4 +86,16 @@ export async function updateAgent(
 		.where(eq(agentTable.id, id))
 		.returning();
 	return updatedAgent;
+}
+
+/**
+ * Create a new agent cast
+ * @param cast - The agent cast to create
+ * @returns The created agent cast
+ */
+export async function createAgentCast(
+	cast: CreateAgentCast,
+): Promise<AgentCast> {
+	const [newCast] = await db.insert(agentCastTable).values(cast).returning();
+	return newCast;
 }

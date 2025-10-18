@@ -1,6 +1,9 @@
 import type { Job } from "bullmq";
 import { v4 as uuidv4 } from "uuid";
-import { getAgentByCreatorFidOrFid } from "../lib/database/queries/agent.query.js";
+import {
+	createAgentCast,
+	getAgentByCreatorFidOrFid,
+} from "../lib/database/queries/agent.query.js";
 import {
 	// sendMessageToUserViaNeynar,
 	// sendMessageToUserViaNeynarRaw,
@@ -66,11 +69,12 @@ export async function processNeynarWebhookJob(
 			`[neynar-webhook-job] Response for fid ${fid} ${response.answer}`,
 		);
 
+		const parentHash = cast.hash;
 		const newCast = await postCastToFarcaster({
 			signerUuid: agent.signerUuid,
 			text: response.answer,
 			embeds: [],
-			parentHash: cast.hash,
+			parentHash,
 			idempotencyKey: uuidv4(),
 			authorFid: cast.authorFid,
 		});
@@ -78,6 +82,16 @@ export async function processNeynarWebhookJob(
 			"new cast posted to farcaster",
 			JSON.stringify(newCast, null, 2),
 		);
+		// save agent cast to db
+		await createAgentCast({
+			id: uuidv4(),
+			agentFid: agent.fid,
+			castHash: newCast.cast.hash,
+			castText: response.answer,
+			parentCastHash: parentHash,
+			parentCastText: question,
+			parentCastAuthorFid: cast.authorFid,
+		});
 
 		progress += increment;
 		await job.updateProgress(progress);

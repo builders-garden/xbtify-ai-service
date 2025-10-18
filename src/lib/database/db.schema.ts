@@ -190,6 +190,24 @@ export const groupMemberTable = pgTable(
 export type GroupMember = typeof groupMemberTable.$inferSelect;
 export type CreateGroupMember = typeof groupMemberTable.$inferInsert;
 
+// Agent cast table
+export const agentCastTable = pgTable("agent_cast", {
+	id: text("id").primaryKey(),
+	agentFid: integer("agent_fid").references(() => agentTable.fid, {
+		onDelete: "cascade",
+	}),
+	castHash: text("cast_hash").notNull(),
+	castText: text("cast_text").notNull(),
+	parentCastHash: text("parent_cast_hash"),
+	parentCastText: text("parent_cast_text"),
+	parentCastAuthorFid: integer("parent_cast_author_fid"),
+	createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AgentCast = typeof agentCastTable.$inferSelect;
+export type CreateAgentCast = typeof agentCastTable.$inferInsert;
+export type UpdateAgentCast = Partial<CreateAgentCast>;
+
 /**
  * Drizzle Relations
  */
@@ -219,11 +237,12 @@ export const replyRelations = relations(replyTable, ({ one }) => ({
 	}),
 }));
 
-export const agentRelations = relations(agentTable, ({ one }) => ({
+export const agentRelations = relations(agentTable, ({ one, many }) => ({
 	creator: one(userTable, {
 		fields: [agentTable.creatorFid],
 		references: [userTable.farcasterFid],
 	}),
+	casts: many(agentCastTable),
 }));
 
 export const groupRelations = relations(groupTable, ({ many }) => ({
