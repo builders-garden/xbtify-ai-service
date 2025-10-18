@@ -1,11 +1,12 @@
-import { createAgent } from "../lib/database/queries/agent.query.js";
 import {
 	createCasts,
 	deleteAllCastsByFid,
+  getCastsByFid,
 } from "../lib/database/queries/cast.query.js";
 import {
 	createReplies,
 	deleteAllRepliesByFid,
+  getRepliesByFid,
 } from "../lib/database/queries/reply.query.js";
 import {
 	fetchUserCasts,
@@ -17,8 +18,10 @@ import {
 	filterCastsByLength,
 	filterRepliesByLength,
 } from "../lib/utils/agent.js";
+import { createAgent, getAgentByFid, updateAgent } from "../lib/database/queries/agent.query.js";
 import { AgentStatus } from "../types/enums.js";
-import { Agent } from "../lib/database/db.schema.js";
+import { runInitAgent } from "../lib/agent/init_agent.js";
+import { Agent } from "@/lib/database/db.schema.js";
 
 const minLength = 30;
 
@@ -26,10 +29,14 @@ export const initAgent = async ({ fid }: { fid: number }) => {
 	try {
 		// doing something here
 		console.log("[agent.service]: initAgent called");
+    // step 1: fetch and store fresh casts
+		const { casts,count } = await fetchAndStoreFarcasterCasts(fid);
 
-		const { count } = await fetchAndStoreFarcasterCasts(fid);
+    // step 2: generate style_profile_prompt base on casts
+    const style_profile_prompt = await runInitAgent(casts.map((cast) => cast.text).join("\n"));
 
-		await storeNewAgentInDb(fid, AgentStatus.INITIALIZING);
+    // step 3: store agent in database
+		await storeNewAgentInDb(fid, AgentStatus.INITIALIZING, style_profile_prompt.response);
 
 		return {
 			fid,
@@ -53,14 +60,20 @@ export const reinitializeAgent = async ({ fid, deleteCasts, deleteReplies }: { f
     let deletedRepliesCount = 0;
     let importedCastsCount = 0;
     let importedRepliesCount = 0;
+    let storedCasts = [];
+    let storedReplies = [];
     if (deleteCasts) {
       deletedCastsCount = await deleteAllCastsByFid(fid);
       console.log(
         `[agent.service|${new Date().toISOString()}]: deleted ${deletedCastsCount} existing casts for fid ${fid}`,
       );
       // step 2: fetch and store fresh casts
-		  const { count } = await fetchAndStoreFarcasterCasts(fid);
+		  const { casts, count } = await fetchAndStoreFarcasterCasts(fid);
+      storedCasts = casts;
       importedCastsCount = count;
+    }
+    else {
+      storedCasts = await getCastsByFid(fid);
     }
 
     if (deleteReplies) {
@@ -69,9 +82,21 @@ export const reinitializeAgent = async ({ fid, deleteCasts, deleteReplies }: { f
         `[agent.service|${new Date().toISOString()}]: deleted ${deletedRepliesCount} existing replies for fid ${fid}`,
       );
       // step 3: fetch and store fresh replies
-    const { count } = await fetchAndStoreFarcasterReplies(fid);
+    const { replies, count } = await fetchAndStoreFarcasterReplies(fid);
+    storedReplies = replies;
     importedRepliesCount = count;
     }
+    else {
+      storedReplies = await getRepliesByFid(fid);
+    }
+
+    // step 3: generate style_profile_prompt base on casts
+    const style_profile_prompt = await runInitAgent(storedCasts.map((cast) => cast.text).join("\n"));
+    console.log(`[agent.service]: generated style_profile_prompt base on casts: ${style_profile_prompt}`);
+
+    // step 4: update or create agent in database
+    await updateOrCreateAgent(fid, AgentStatus.REINITIALIZING, style_profile_prompt.response);
+
 
 		return {
 			fid,
@@ -176,15 +201,45 @@ async function fetchAndStoreFarcasterReplies(fid: number) {
 	};
 }
 
-async function storeNewAgentInDb(fid: number, status: AgentStatus) {
-	const newAgent = await createAgent({
-		fid: 1,
-		creatorFid: fid,
-		status,
-	});
-	console.log(
-		`[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`,
-	);
+async function storeNewAgentInDb(fid: number, status: AgentStatus, styleProfilePrompt: string) {
+  const newAgent = await createAgent({
+    fid: fid,
+    creatorFid: fid,
+    status,
+    styleProfilePrompt,
+  });
+  console.log(
+    `[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`
+  );
 
 	return newAgent;
+}
+
+async function updateOrCreateAgent(fid: number, status: AgentStatus, styleProfilePrompt: string) {
+  // Check if agent already exists
+  const existingAgent = await getAgentByFid(fid);
+  
+  if (existingAgent) {
+    // Update existing agent
+    const updatedAgent = await updateAgent(existingAgent.id, {
+      status,
+      styleProfilePrompt,
+    });
+    console.log(
+      `[agent.service|${new Date().toISOString()}]: updated existing agent for fid ${fid} with status ${status}`
+    );
+    return updatedAgent;
+  } else {
+    // Create new agent
+    const newAgent = await createAgent({
+      fid: fid,
+      creatorFid: fid,
+      status,
+      styleProfilePrompt,
+    });
+    console.log(
+      `[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`
+    );
+    return newAgent;
+  }
 }
