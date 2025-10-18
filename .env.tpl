@@ -17,9 +17,6 @@ NEYNAR_API_KEY="your_neynar_api_key_here"
 NEYNAR_WEBHOOK_ID="123"
 NEYNAR_WEBHOOK_SECRET="456"
 
-# Application URL (for notifications)
-APP_URL=http://localhost:3000
-
 API_SECRET_KEY=your_api_secret_key_here
 
 MIDJOURNEY_API_KEY=your_midjourney_api_key_here

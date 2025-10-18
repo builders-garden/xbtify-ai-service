@@ -33,9 +33,6 @@ const envSchema = z.object({
 	NEYNAR_WEBHOOK_ID: z.string().min(1),
 	NEYNAR_WEBHOOK_SECRET: z.string().min(1),
 
-	// Application
-	APP_URL: z.string().url(),
-
 	// Secret shared with Next.js instance
 	SHARED_API_KEY_WITH_NEXT: z.string().min(1),
 
