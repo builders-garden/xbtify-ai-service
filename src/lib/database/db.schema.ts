@@ -259,3 +259,10 @@ export const groupMemberRelations = relations(groupMemberTable, ({ one }) => ({
 		references: [groupTable.id],
 	}),
 }));
+
+export const agentCastRelations = relations(agentCastTable, ({ one }) => ({
+	agent: one(agentTable, {
+		fields: [agentCastTable.agentFid],
+		references: [agentTable.fid],
+	}),
+}));
