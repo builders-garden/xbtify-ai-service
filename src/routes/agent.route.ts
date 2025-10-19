@@ -1,5 +1,6 @@
 import express from "express";
 import {
+	getAgentInfoController,
 	handleAskAgentController,
 	initAgentController,
 	reinitializeAgentController,
@@ -18,7 +19,7 @@ const router = express.Router();
 router.post("/init", initAgentController);
 router.post("/:fid/reinitialize", reinitializeAgentController);
 router.post("/:fid/ask", handleAskAgentController);
-router.get("/:fid/info", initAgentController);
+router.get("/:fid/info", getAgentInfoController);
 router.post("/image/negative", async (req, res) => {
 	try {
 		const { imageUrl, filename } = req.body;
