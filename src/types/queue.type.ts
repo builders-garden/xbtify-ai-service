@@ -18,7 +18,7 @@ export interface NeynarWebhookJobData {
 }
 
 export type AgentInitJobData = {
-	fid: number;
+	creatorFid: number;
 	personality: string;
 	tone: string;
 	movieCharacter: string;

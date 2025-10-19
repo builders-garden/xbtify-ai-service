@@ -33,7 +33,7 @@ export const initAgentController = async (req: Request, res: Response) => {
 		await agentInitializationQueue.add(
 			QueueName.AGENT_INITIALIZATION,
 			{
-				fid: safeBody.fid,
+				creatorFid: safeBody.fid,
 				personality: safeBody.personality,
 				tone: safeBody.tone,
 				movieCharacter: safeBody.movieCharacter,

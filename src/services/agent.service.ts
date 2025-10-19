@@ -47,9 +47,9 @@ export const initAgent = async (data: AgentInitJobData) => {
 		console.log("[agent.service]: initAgent called");
 
 		// step 0. get farcaster user
-		const farcasterUser = await fetchUserFromNeynarByFid(data.fid);
+		const farcasterUser = await fetchUserFromNeynarByFid(data.creatorFid);
 		if (!farcasterUser) {
-			throw new Error(`Farcaster user not found for fid ${data.fid}`);
+			throw new Error(`Farcaster user not found for fid ${data.creatorFid}`);
 		}
 
 		const newFname = `${getCleanFarcasterUsername(farcasterUser.username)}xbt`;
@@ -86,7 +86,7 @@ export const initAgent = async (data: AgentInitJobData) => {
 		// step 1.b: update neynar webhook
 		const allFids = await getAllAgentsFids();
 		// use set to avoid duplicates
-		const allFidsSet = new Set([...allFids, data.fid, farcasterAccount.fid]);
+		const allFidsSet = new Set([...allFids, data.creatorFid, farcasterAccount.fid]);
 
 		await updateNeynarWebhookCastCreated({
 			webhookId: env.NEYNAR_WEBHOOK_ID,
@@ -98,7 +98,7 @@ export const initAgent = async (data: AgentInitJobData) => {
 		// step 2: store agent in database
 		const agent = await storeNewAgentInDb({
 			fid: farcasterAccount.fid,
-			creatorFid: data.fid,
+			creatorFid: data.creatorFid,
 			status: AgentStatus.INITIALIZING,
 			personality: data.personality,
 			tone: data.tone,
@@ -112,12 +112,12 @@ export const initAgent = async (data: AgentInitJobData) => {
 		console.log(`Agent stored in database:${agent.id}`);
 
 		// step 3: fetch and store fresh casts
-		const { casts, count } = await fetchAndStoreFarcasterCasts(data.fid);
+		const { casts, count } = await fetchAndStoreFarcasterCasts(data.creatorFid);
 		// const casts = await getCastsByFid(data.fid);
 		// const count = casts.length;
 
 		// step 4. get replies
-		const { replies, count: repliesCount } = await fetchAndStoreFarcasterReplies(data.fid);
+		const { replies, count: repliesCount } = await fetchAndStoreFarcasterReplies(data.creatorFid);
 		// const replies = await getRepliesByFid(data.fid);
 		// const repliesCount = replies.length;
 
@@ -128,11 +128,11 @@ export const initAgent = async (data: AgentInitJobData) => {
 	);
 
 	// step 5.b: create RAG embeddings and upload to Pinecone
-	console.log(`[agent.service]: Creating RAG embeddings for fid ${data.fid}`);
+	console.log(`[agent.service]: Creating RAG embeddings for fid ${data.creatorFid}`);
 	const chunks = chunkCasts(casts);
 	const embeddings = await createEmbeddings(chunks.map((c) => c.text));
-	await createAndUploadToPinecone(`xbtify-${data.fid}`, chunks, embeddings);
-	console.log(`[agent.service]: RAG pipeline completed for fid ${data.fid}`);
+	await createAndUploadToPinecone(`xbtify-${data.creatorFid}`, chunks, embeddings);
+	console.log(`[agent.service]: RAG pipeline completed for fid ${data.creatorFid}`);
 
 	// step 6: update style_profile_prompt for agent
 		const updatedAgent = await updateAgent(agent.id, {
@@ -142,7 +142,7 @@ export const initAgent = async (data: AgentInitJobData) => {
 		console.log(`Agent updated:${updatedAgent?.id}`);
 
 		return {
-			fid: data.fid,
+			fid: data.creatorFid,
 			agent: {
 				id: updatedAgent?.id,
 				fid: updatedAgent?.fid,
@@ -212,11 +212,11 @@ export const reinitializeAgent = async ({
 		}
 
 		// step 3.b: create RAG embeddings and upload to Pinecone
-		console.log(`[agent.service]: Creating RAG embeddings for fid ${fid}`);
+		console.log(`[agent.service]: Creating RAG embeddings for fid ${creatorFid}`);
 		const chunks = chunkCasts(storedCasts);
 		const embeddings = await createEmbeddings(chunks.map((c) => c.text));
-		await createAndUploadToPinecone(`xbtify-${fid}`, chunks, embeddings);
-		console.log(`[agent.service]: RAG pipeline completed for fid ${fid}`);
+		await createAndUploadToPinecone(`xbtify-${creatorFid}`, chunks, embeddings);
+		console.log(`[agent.service]: RAG pipeline completed for fid ${creatorFid}`);
 
 		// Only run agent initialization and database update if onlyRAG is false
 		if (!onlyRAG) {
@@ -224,7 +224,7 @@ export const reinitializeAgent = async ({
 			const castsText = JSON.stringify(storedCasts.map((cast) => ({ text: cast.text })));
 			const repliesText = JSON.stringify(storedReplies.map((reply) => ({ parentText: reply.parentText, text: reply.text })));
 			const styleProfilePromptResult = await runInitAgent(castsText, repliesText);
-			console.log(`[agent.service]: generated style_profile_prompt base on casts and replies for fid ${fid}`);
+			console.log(`[agent.service]: generated style_profile_prompt base on casts and replies for fid ${creatorFid}`);
 
 			// step 4: update or create agent in database
 			await updateOrCreateAgent({
@@ -272,7 +272,7 @@ export const handleAskAgent = async ({
   try {
     // Retrieve relevant context from Pinecone
     const indexName = `xbtify-${agent.creatorFid}`;
-    const contextChunks = await retrieveContext(indexName, question, 1);
+    const contextChunks = await retrieveContext(indexName, question, 3);
     const context = contextChunks.join('\n\n');
     console.log(`[agent.service]: Retrieved ${contextChunks.length} context chunks for question`);
 
