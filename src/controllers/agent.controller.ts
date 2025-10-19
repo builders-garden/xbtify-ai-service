@@ -73,6 +73,7 @@ export const initAgentController = async (req: Request, res: Response) => {
 const reinitSchema = z.object({
 	deleteCasts: z.boolean().optional().default(false),
 	deleteReplies: z.boolean().optional().default(false),
+	onlyRAG: z.boolean().optional().default(true),
 	personality: z.string().min(1).optional(),
 	tone: z.string().min(1).optional(),
 	movieCharacter: z.string().min(1).optional(),
@@ -109,6 +110,7 @@ export const reinitializeAgentController = async (
 				creatorFid: existingAgent.creatorFid,
 				deleteCasts: safeBody.deleteCasts,
 				deleteReplies: safeBody.deleteReplies,
+				onlyRAG: safeBody.onlyRAG,
 				personality: safeBody.personality,
 				tone: safeBody.tone,
 				movieCharacter: safeBody.movieCharacter,
@@ -200,7 +202,7 @@ const askAgentSchema = z.object({
 
 export const handleAskAgentController = async (req: Request, res: Response) => {
   try {
-    const fid = parseInt(req.params.id, 10);
+    const fid = parseInt(req.params.fid, 10);
 
     if (!fid) {
       return res.status(400).json({

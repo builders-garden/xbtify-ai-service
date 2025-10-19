@@ -35,6 +35,10 @@ import type { AgentInitJobData, AgentReinitJobData } from "../types/queue.type.j
 import { runInitAgent } from "../lib/agent/init_agent.js";
 import { runAssistant } from "../lib/agent/assistant.js";
 import { getNegativeImageAndUpload } from "../lib/image.js";
+import { chunkCasts } from "../lib/rag/chunking.js";
+import { createEmbeddings } from "../lib/rag/embeddings.js";
+import { createAndUploadToPinecone } from "../lib/rag/pinecone.js";
+import { retrieveContext } from "../lib/rag/retrieval.js";
 
 const minLength = 30;
 
@@ -117,13 +121,20 @@ export const initAgent = async (data: AgentInitJobData) => {
 		// const replies = await getRepliesByFid(data.fid);
 		// const repliesCount = replies.length;
 
-		// step 5: generate style_profile_prompt base on casts
-		const style_profile_prompt = await runInitAgent(
-			casts.map((cast) => cast.text).join("\n"),
-			replies.map((reply) => reply.text).join("\n"),
-		);
+	// step 5: generate style_profile_prompt base on casts
+	const style_profile_prompt = await runInitAgent(
+		casts.map((cast) => cast.text).join("\n"),
+		replies.map((reply) => reply.text).join("\n"),
+	);
 
-		// step 6: update style_profile_prompt for agent
+	// step 5.b: create RAG embeddings and upload to Pinecone
+	console.log(`[agent.service]: Creating RAG embeddings for fid ${data.fid}`);
+	const chunks = chunkCasts(casts);
+	const embeddings = await createEmbeddings(chunks.map((c) => c.text));
+	await createAndUploadToPinecone(`xbtify-${data.fid}`, chunks, embeddings);
+	console.log(`[agent.service]: RAG pipeline completed for fid ${data.fid}`);
+
+	// step 6: update style_profile_prompt for agent
 		const updatedAgent = await updateAgent(agent.id, {
 			status: AgentStatus.READY,
 			styleProfilePrompt: style_profile_prompt.response,
@@ -156,6 +167,7 @@ export const reinitializeAgent = async ({
 	creatorFid,
 	deleteCasts,
 	deleteReplies,
+	onlyRAG,
 	personality,
 	tone,
 	movieCharacter,
@@ -199,14 +211,23 @@ export const reinitializeAgent = async ({
 			storedReplies = await getRepliesByFid(creatorFid);
 		}
 
-    // step 3: generate style_profile_prompt base on casts and replies
-    const castsText = JSON.stringify(storedCasts.map((cast) => ({ text: cast.text })));
-    const repliesText = JSON.stringify(storedReplies.map((reply) => ({ parentText: reply.parentText, text: reply.text })));
-    const styleProfilePromptResult = await runInitAgent(castsText, repliesText);
-    console.log(`[agent.service]: generated style_profile_prompt base on casts and replies for fid ${creatorFid}`);
+		// step 3.b: create RAG embeddings and upload to Pinecone
+		console.log(`[agent.service]: Creating RAG embeddings for fid ${fid}`);
+		const chunks = chunkCasts(storedCasts);
+		const embeddings = await createEmbeddings(chunks.map((c) => c.text));
+		await createAndUploadToPinecone(`xbtify-${fid}`, chunks, embeddings);
+		console.log(`[agent.service]: RAG pipeline completed for fid ${fid}`);
 
-    // step 4: update or create agent in database
-    await updateOrCreateAgent({
+		// Only run agent initialization and database update if onlyRAG is false
+		if (!onlyRAG) {
+			// step 3: generate style_profile_prompt base on casts and replies
+			const castsText = JSON.stringify(storedCasts.map((cast) => ({ text: cast.text })));
+			const repliesText = JSON.stringify(storedReplies.map((reply) => ({ parentText: reply.parentText, text: reply.text })));
+			const styleProfilePromptResult = await runInitAgent(castsText, repliesText);
+			console.log(`[agent.service]: generated style_profile_prompt base on casts and replies for fid ${fid}`);
+
+			// step 4: update or create agent in database
+			await updateOrCreateAgent({
 			fid,
 			creatorFid,
 			status: AgentStatus.READY,
@@ -215,6 +236,7 @@ export const reinitializeAgent = async ({
 			tone,
 			movieCharacter,
 		});
+		}
 
 	return {
 			fid,
@@ -248,8 +270,14 @@ export const handleAskAgent = async ({
   }
 
   try {
-    // Call the assistant with the style profile and question
-    const assistantResult = await runAssistant(styleProfilePrompt, question);
+    // Retrieve relevant context from Pinecone
+    const indexName = `xbtify-${agent.creatorFid}`;
+    const contextChunks = await retrieveContext(indexName, question, 1);
+    const context = contextChunks.join('\n\n');
+    console.log(`[agent.service]: Retrieved ${contextChunks.length} context chunks for question`);
+
+    // Call the assistant with the style profile, question, and context
+    const assistantResult = await runAssistant(styleProfilePrompt, question, context);
     
     // Parse the JSON response to extract the text field
     const parsedResponse = JSON.parse(assistantResult.response);

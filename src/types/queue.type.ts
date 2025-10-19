@@ -29,6 +29,7 @@ export type AgentReinitJobData = {
 	fid: number;
 	deleteCasts: boolean;
 	deleteReplies: boolean;
+	onlyRAG: boolean;
 	personality: string;
 	tone: string;
 	movieCharacter: string;
