@@ -57,7 +57,7 @@ A powerful AI-driven backend service built with Node.js and TypeScript, featurin
 
 ```bash
 git clone https://github.com/builders-garden/xbtify-ai-service.git
-cd ai-service-be
+cd xbtify-ai-service
 ```
 
 ### 2. Install Dependencies
@@ -300,7 +300,7 @@ src/
 
 ## 🔗 Related Projects
 
-- **Frontend**: [XBTify Next.js App](https://github.com/builders-garden/xbtify-next)
+- **Frontend**: [XBTify MiniApp](https://github.com/builders-garden/xbtify)
 - **Farcaster**: [Neynar Documentation](https://docs.neynar.com)
 - **LangChain**: [LangChain Documentation](https://js.langchain.com)
 
