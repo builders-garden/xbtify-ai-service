@@ -38,16 +38,19 @@ export async function getAgentByCreatorFidOrFid(
 }
 
 /**
- * Get all agent FIDs
- * @returns All agent FIDs
+ * Get all agent FIDs and creator FIDs (combined and deduplicated)
+ * @returns All unique agent FIDs and creator FIDs
  */
 export async function getAllAgentsFids(): Promise<number[]> {
-	const fids = await db.query.agentTable.findMany({
+	const agents = await db.query.agentTable.findMany({
 		columns: {
 			fid: true,
+			creatorFid: true,
 		},
 	});
-	return fids.map((row) => row.fid);
+	// Combine all FIDs and creatorFIDs, then remove duplicates using Set
+	const allFids = agents.flatMap((agent) => [agent.fid, agent.creatorFid]);
+	return [...new Set(allFids)];
 }
 
 /**
