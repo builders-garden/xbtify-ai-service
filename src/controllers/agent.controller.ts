@@ -169,7 +169,20 @@ export const getAgentInfoController = async (req: Request, res: Response) => {
 
 		return res.status(200).json({
 			status: "ok",
-			data: existingAgent,
+			data: {
+				id: existingAgent.id,
+				fid: existingAgent.fid,
+				creatorFid: existingAgent.creatorFid,
+				avatarUrl: existingAgent.avatarUrl,
+				displayName: existingAgent.displayName,
+				status: existingAgent.status,
+				personality: existingAgent.personality,
+				tone: existingAgent.tone,
+				movieCharacter: existingAgent.movieCharacter,
+				createdAt: existingAgent.createdAt,
+				updatedAt: existingAgent.updatedAt,
+				keywords: existingAgent.keywords,
+			},
 		});
 	} catch (error) {
 		console.error("Error fetching agent info:", error);
