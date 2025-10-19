@@ -1,7 +1,7 @@
 import { Configuration, NeynarAPIClient } from "@neynar/nodejs-sdk";
 import ky from "ky";
 import { env } from "../config/env.js";
-import type { NeynarCast, NeynarUser, NeynarWebhook } from "../types/neynar.js";
+import type { NeynarCast, NeynarCreateFarcasterUserResponse, NeynarUser, NeynarWebhook } from "../types/neynar.js";
 
 const NEYNAR_API_BASE_URL = "https://api.neynar.com/v2/farcaster";
 
@@ -415,7 +415,7 @@ export const registerFarcasterAccount = async (params: {
 		url: string;
 		display_name: string;
 	};
-}): Promise<{ success: boolean }> => {
+}): Promise<NeynarCreateFarcasterUserResponse> => {
 	const registerResponse = await fetch(
 		"https://api.neynar.com/v2/farcaster/user",
 		{
@@ -445,7 +445,7 @@ export const registerFarcasterAccount = async (params: {
 		);
 	}
 
-	const data = (await registerResponse.json()) as { success: boolean };
+	const data = (await registerResponse.json()) as NeynarCreateFarcasterUserResponse;
 	return data;
 };
 

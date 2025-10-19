@@ -121,6 +121,19 @@ type CastEmbedCastId = {
 	hash: string;
 };
 
+export type NeynarCreateFarcasterUserResponse = { 
+		success: boolean, 
+		signer: {
+			"object": "signer",
+			"signer_uuid": string,
+			"public_key": string,
+			"status": string,
+			"signer_approval_url": string,
+			"fid": number,
+			"permissions": string[]
+  	}
+	};
+
 type ImageMetadata = {
 	content_type: string;
 	content_length: number;

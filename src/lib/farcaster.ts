@@ -26,6 +26,7 @@ type CreateFarcasterAccountResult = {
 	mnemonic: string;
 	custodyAddress: Address;
 	fname: string;
+	signerUuid: string;
 };
 
 /**
@@ -140,5 +141,6 @@ export async function createFarcasterAccount(
 		mnemonic,
 		custodyAddress,
 		fname: params.fname,
+		signerUuid: registerResponse.signer.signer_uuid,
 	};
 }

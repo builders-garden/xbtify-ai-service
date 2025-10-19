@@ -77,11 +77,7 @@ export const initAgent = async (data: AgentInitJobData) => {
 			pfpUrl,
 			url: `https://xbtify.vercel.app/${farcasterUser.fid}`,
 		});
-		console.log("Farcaster account created:", {
-			fid: farcasterAccount.fid,
-			fname: farcasterAccount.fname,
-			custodyAddress: farcasterAccount.custodyAddress,
-		});
+		console.log("Farcaster account created:", farcasterAccount);
 
 		// step 1.b: update neynar webhook
 		const allFids = await getAllAgentsFids();
@@ -108,6 +104,7 @@ export const initAgent = async (data: AgentInitJobData) => {
 			custodyAddress: farcasterAccount.custodyAddress,
 			mnemonic: farcasterAccount.mnemonic,
 			avatarUrl: pfpUrl,
+			signerUuid: farcasterAccount.signerUuid,
 		});
 		console.log(`Agent stored in database:${agent.id}`);
 
@@ -384,6 +381,7 @@ async function storeNewAgentInDb({
 	custodyAddress,
 	mnemonic,
 	avatarUrl,
+	signerUuid,
 }: {
 	fid: number;
 	creatorFid: number;
@@ -397,6 +395,7 @@ async function storeNewAgentInDb({
 	custodyAddress: string;
 	mnemonic: string;
 	avatarUrl?: string;
+	signerUuid?: string;
 }) {
 	const newAgent = await createAgent({
 		fid,
@@ -411,6 +410,7 @@ async function storeNewAgentInDb({
 		avatarUrl,
 		address: custodyAddress,
 		mnemonic,
+		signerUuid,
 	});
 	console.log(
 		`[agent.service|${new Date().toISOString()}]: created new agent for fid ${fid} with status ${status}`,
