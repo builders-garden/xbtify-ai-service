@@ -11,6 +11,7 @@ import {
 } from "../lib/neynar.js";
 import { handleAskAgent } from "../services/agent.service.js";
 import type { JobResult, NeynarWebhookJobData } from "../types/queue.type.js";
+import { upsertUserMetadata } from "../lib/database/queries/user-metadata.query.js";
 
 /**
  * Process neynar webhook - handle neynar webhook for any farcaster user
@@ -43,7 +44,7 @@ export async function processNeynarWebhookJob(
 			continue;
 		}
 		// the bot should not respond to its own cast
-		if (agent.fid === cast.authorFid) {
+		if (agent.fid === cast.author.fid) {
 			console.log(
 				`[neynar-webhook-job] Agent ${agent.fid} is the same as the author of the cast, skipping`,
 			);
@@ -76,7 +77,7 @@ export async function processNeynarWebhookJob(
 			embeds: [],
 			parentHash,
 			idempotencyKey: uuidv4(),
-			authorFid: cast.authorFid,
+			authorFid: cast.author.fid,
 		});
 		console.log(
 			"new cast posted to farcaster",
@@ -90,7 +91,15 @@ export async function processNeynarWebhookJob(
 			castText: response.answer,
 			parentCastHash: parentHash,
 			parentCastText: question,
-			parentCastAuthorFid: cast.authorFid,
+			parentCastAuthorFid: cast.author.fid,
+		});
+
+		await upsertUserMetadata({
+			fid: cast.author.fid,
+			username: cast.author.username,
+			displayName: cast.author.displayName,
+			bio: cast.author.bio,
+			avatarUrl: cast.author.avatarUrl,
 		});
 
 		progress += increment;

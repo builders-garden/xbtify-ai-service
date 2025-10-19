@@ -35,10 +35,16 @@ export const neynarWebhookController = async (req: Request, res: Response) => {
 				cast: {
 					hash: cast.hash,
 					text: cast.text,
-					authorFid: cast.author.fid,
 					createdAt: new Date(createdAt),
 					mentionedFids,
 					url: `https://farcaster.xyz/${cast.author.username}/${cast.hash}`,
+					author: {
+						fid: cast.author.fid,
+						username: cast.author.username,
+						displayName: cast.author.display_name,
+						bio: cast.author.profile.bio.text,
+						avatarUrl: cast.author.pfp_url,
+					},
 				},
 			},
 		);

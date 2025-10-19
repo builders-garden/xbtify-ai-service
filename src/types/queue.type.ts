@@ -4,10 +4,16 @@ export interface NeynarWebhookJobData {
 	cast: {
 		hash: string;
 		text: string;
-		authorFid: number;
 		createdAt: Date;
 		mentionedFids: number[];
 		url: string;
+		author: {
+			fid: number;
+			username: string;
+			displayName?: string;
+			bio?: string;
+			avatarUrl?: string;
+		}
 	};
 }
 
@@ -19,6 +25,7 @@ export type AgentInitJobData = {
 };
 
 export type AgentReinitJobData = {
+	creatorFid: number;
 	fid: number;
 	deleteCasts: boolean;
 	deleteReplies: boolean;

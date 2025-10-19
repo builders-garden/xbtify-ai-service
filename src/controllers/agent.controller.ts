@@ -105,7 +105,8 @@ export const reinitializeAgentController = async (
 		await agentReinitializationQueue.add(
 			QueueName.AGENT_REINITIALIZATION,
 			{
-				fid: existingAgent.creatorFid,
+				fid: existingAgent.fid,
+				creatorFid: existingAgent.creatorFid,
 				deleteCasts: safeBody.deleteCasts,
 				deleteReplies: safeBody.deleteReplies,
 				personality: safeBody.personality,
