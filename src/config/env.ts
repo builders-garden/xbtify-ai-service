@@ -52,6 +52,13 @@ const envSchema = z.object({
 	IMAGEKIT_PUBLIC_KEY: z.string().min(1),
 	IMAGEKIT_PRIVATE_KEY: z.string().min(1),
 	IMAGEKIT_URL_ENDPOINT: z.string().url(),
+
+	// Pinecone
+	PINECONE_API_KEY: z.string().min(1),
+
+	// OpenAI
+	OPENAI_API_KEY: z.string().min(1),
+
 });
 
 export type Env = z.infer<typeof envSchema>;

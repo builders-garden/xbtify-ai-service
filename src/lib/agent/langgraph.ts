@@ -22,5 +22,6 @@ export const InitAgentState = Annotation.Root({
 export const AssistantAgentState = Annotation.Root({
     styleProfile: Annotation<string>,
     question: Annotation<string>,
+    context: Annotation<string>,
     response: Annotation<string>,
   });

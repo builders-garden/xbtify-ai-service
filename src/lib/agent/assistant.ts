@@ -6,7 +6,7 @@ import { HumanMessage } from '@langchain/core/messages';
 
 // AnswerQuestion Node - Generates styled answer based on style profile
 async function answerQuestionNode(state: typeof AssistantAgentState.State): Promise<Partial<typeof AssistantAgentState.State>> {
-  const { styleProfile, question } = state;
+  const { styleProfile, question, context } = state;
   console.log(`[AnswerQuestionNode] Processing question: ${question}`);
   
   const prompt = `
@@ -43,6 +43,7 @@ async function answerQuestionNode(state: typeof AssistantAgentState.State): Prom
   8. **Do not ABUSE the vocabulary**: take inspiration from the vocabulary but do not use it verbatim. 
   9. **No greetings if not asked**: Do not say 'gm' or other greetings if there isn't a greeting in the question.
   10. **Answer dummy questions**: if the question is a dummy question, or very short, answer with a very short and dummy answer.
+  11. **Can use the context**: if the question is asking for opinions, information, or anything that can be answered with the context, use the context to answer the question.
   
   ### OUTPUT FORMAT ###
   
@@ -57,6 +58,10 @@ async function answerQuestionNode(state: typeof AssistantAgentState.State): Prom
   ### STYLE PROFILE ###
   
   ${styleProfile}
+
+  ### RELEVANT CONTEXT FROM USER'S CASTS ###
+
+  ${context || 'No specific context available.'}
 
   ### QUESTION ###
 
@@ -131,7 +136,8 @@ function createAssistantGraph() {
 // Main assistant function that uses LangGraph
 export async function runAssistant(
   styleProfile: string,
-  question: string
+  question: string,
+  context?: string
 ): Promise<{
   response: string;
 }> {
@@ -150,7 +156,8 @@ export async function runAssistant(
     // Run the graph 
     const result = await graph.invoke({
       styleProfile: styleProfile,
-      question: question
+      question: question,
+      context: context || ''
     }, { callbacks: [langfuseHandler] });
     
     return {
