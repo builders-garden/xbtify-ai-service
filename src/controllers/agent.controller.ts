@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import {
+	getAgentByCreatorFidOrFid,
 	getAgentByFid,
-	getAgentById,
 } from "../lib/database/queries/agent.query.js";
 import { agentInitializationQueue } from "../queues/agentInitialization.queue.js";
 import { agentReinitializationQueue } from "../queues/agentReinitialization.queue.js";
@@ -152,15 +152,15 @@ export const reinitializeAgentController = async (
 
 export const getAgentInfoController = async (req: Request, res: Response) => {
 	try {
-		const id = req.params.id;
-		if (!id) {
+		const fid = req.params.fid;
+		if (!fid || isNaN(Number(fid))) {
 			return res.status(400).json({
 				status: "nok",
-				message: "Agent ID is required",
+				message: "Agent FID is required",
 			});
 		}
 
-		const existingAgent = await getAgentById(id);
+		const existingAgent = await getAgentByCreatorFidOrFid(Number(fid));
 
 		if (!existingAgent) {
 			return res.status(404).json({
@@ -213,7 +213,7 @@ export const handleAskAgentController = async (req: Request, res: Response) => {
 
 		const safeBody = askAgentSchema.parse(req.body);
 
-    const agent = await getAgentByFid(fid);
+    const agent = await getAgentByCreatorFidOrFid(fid);
 
 		if (!agent) {
 			return res.status(404).json({
