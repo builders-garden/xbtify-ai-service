@@ -198,8 +198,10 @@ async function answerQuestionNode(state: typeof AssistantAgentState.State): Prom
   ### QUESTION ###
 
   ${question}
+
+  ### FINAL INSTRUCTIONS ###
+  - The answer should sound EXACTLY like the user wrote it themselves. Keep it CONCISE and to the point.
   
-  Remember: The answer should sound EXACTLY like the user wrote it themselves. Keep it CONCISE and to the point.
   `;
 
   try {
@@ -318,8 +320,10 @@ async function styleRefinerNode(state: typeof AssistantAgentState.State): Promis
   ### TEXT TO REFINE ###
   
   ${currentText}
+
+  ### FINAL INSTRUCTIONS ###
+  - Make it sound more human and natural while keeping the essence intact.
   
-  Remember: Make it sound more human and natural while keeping the essence intact.
   `;
 
   try {
@@ -433,8 +437,9 @@ async function decideIfDumbNode(state: typeof AssistantAgentState.State): Promis
   ### QUESTION ###
   
   ${question}
-  
-  Remember: Only classify as "yes" (simple social comment) if the question truly requires no substantial analysis or information.
+
+  ### FINAL INSTRUCTIONS ###
+  - Only classify as "yes" (simple social comment) if the question truly requires no substantial analysis or information.
   `;
 
   try {
@@ -549,7 +554,7 @@ async function confidenceScorerNode(state: typeof AssistantAgentState.State): Pr
 
   
   **Low Confidence:**
-  - The topic of the question is not related to the main topics
+  - The topic of the question is very different from the main topics
   - Answer does NOT use any information from the provided context
  
 
@@ -580,12 +585,11 @@ async function confidenceScorerNode(state: typeof AssistantAgentState.State): Pr
   ### GENERATED ANSWER ###
   
   ${answerText}
-  
-  Remember: 
-  - Focus primarily on whether the answer uses information from the context
+
+  ### FINAL INSTRUCTIONS ###
+  - Focus primarily on whether the answer uses information from the context, or if the topic is related to the keywords.
   - Be objective and concise in your evaluation
-  - The reasoning should be 1-2 sentences maximum
-  - Explain whether and how the answer is grounded in the provided context
+  - The reasoning should be 1-2 sentences maximum.
   `;
 
   try {
@@ -714,7 +718,8 @@ async function lowConfidenceFallbackNode(state: typeof AssistantAgentState.State
   
   ${question}
   
-  Remember: The adapted response should sound completely natural and authentic to the user's voice.
+  ### FINAL INSTRUCTIONS ###
+  - The adapted response should sound completely natural and authentic to the user's voice.
   `;
 
   try {
