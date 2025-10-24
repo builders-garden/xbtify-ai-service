@@ -687,6 +687,10 @@ async function lowConfidenceFallbackNode(state: typeof AssistantAgentState.State
   - Match their punctuation and capitalization patterns
   - Keep the core meaning (expressing uncertainty and suggesting alternative sources)
   - Make it concise and natural to their communication style
+
+  ### INSTRUCTIONS ###
+  - Do not mention the creator username or agent username in the response.
+  - Do not mention anyone in the response. Remove all names and usernames from the response.
   
   ### OUTPUT FORMAT ###
   
