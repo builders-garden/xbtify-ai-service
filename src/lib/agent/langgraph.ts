@@ -22,6 +22,12 @@ export const InitAgentState = Annotation.Root({
 export const AssistantAgentState = Annotation.Root({
     styleProfile: Annotation<string>,
     question: Annotation<string>,
-    context: Annotation<string>,
+    context: Annotation<{ text: string }>,
+    conversation: Annotation<Record<string, string>>,
+    agentUsername: Annotation<string>,
     response: Annotation<string>,
+    scoreConfidence: Annotation<string>,
+    reasoningConfidence: Annotation<string>,
+    to_reply: Annotation<boolean>,
+    is_dumb: Annotation<boolean>,
   });

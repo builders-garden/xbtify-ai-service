@@ -1,7 +1,7 @@
 import type { Cast } from "../database/db.schema.js";
 import type { ChunkData } from "./types.js";
 
-const MAX_CHUNK_SIZE = 2000;
+const MAX_CHUNK_SIZE = 3000;
 const CAST_SEPARATOR = "\n\n";
 
 /**
@@ -9,9 +9,10 @@ const CAST_SEPARATOR = "\n\n";
  * without splitting individual casts across chunks.
  * 
  * @param casts - Array of Cast objects to chunk
- * @returns Array of ChunkData objects with chunk_number and text
+ * @param creatorFid - The Farcaster ID of the cast creator
+ * @returns Array of ChunkData objects with chunk_number, text, and creatorFid
  */
-export function chunkCasts(casts: Cast[]): ChunkData[] {
+export function chunkCasts(casts: Cast[], creatorFid: number): ChunkData[] {
 	const chunks: ChunkData[] = [];
 	let currentChunk: string[] = [];
 	let currentSize = 0;
@@ -27,6 +28,7 @@ export function chunkCasts(casts: Cast[]): ChunkData[] {
 			chunks.push({
 				chunk_number: chunkNumber++,
 				text: currentChunk.join(CAST_SEPARATOR),
+				creatorFid,
 			});
 			
 			// Start new chunk
@@ -44,6 +46,7 @@ export function chunkCasts(casts: Cast[]): ChunkData[] {
 		chunks.push({
 			chunk_number: chunkNumber,
 			text: currentChunk.join(CAST_SEPARATOR),
+			creatorFid,
 		});
 	}
 

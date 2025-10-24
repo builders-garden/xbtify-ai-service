@@ -122,13 +122,15 @@ export const initAgent = async (data: AgentInitJobData) => {
 	const style_profile_prompt = await runInitAgent(
 		casts.map((cast) => cast.text).join("\n"),
 		replies.map((reply) => reply.text).join("\n"),
+		data.creatorFid,
+		'init'
 	);
 
 	// step 5.b: create RAG embeddings and upload to Pinecone
 	console.log(`[agent.service]: Creating RAG embeddings for fid ${data.creatorFid}`);
-	const chunks = chunkCasts(casts);
+	const chunks = chunkCasts(casts, data.creatorFid);
 	const embeddings = await createEmbeddings(chunks.map((c) => c.text));
-	await createAndUploadToPinecone(`xbtify-${data.creatorFid}`, chunks, embeddings);
+	await createAndUploadToPinecone(chunks, embeddings);
 	console.log(`[agent.service]: RAG pipeline completed for fid ${data.creatorFid}`);
 
 	// step 6: update style_profile_prompt for agent
@@ -210,9 +212,9 @@ export const reinitializeAgent = async ({
 
 		// step 3.b: create RAG embeddings and upload to Pinecone
 		console.log(`[agent.service]: Creating RAG embeddings for fid ${creatorFid}`);
-		const chunks = chunkCasts(storedCasts);
+		const chunks = chunkCasts(storedCasts, creatorFid);
 		const embeddings = await createEmbeddings(chunks.map((c) => c.text));
-		await createAndUploadToPinecone(`xbtify-${creatorFid}`, chunks, embeddings);
+		await createAndUploadToPinecone(chunks, embeddings);
 		console.log(`[agent.service]: RAG pipeline completed for fid ${creatorFid}`);
 
 		// Only run agent initialization and database update if onlyRAG is false
@@ -220,7 +222,7 @@ export const reinitializeAgent = async ({
 			// step 3: generate style_profile_prompt base on casts and replies
 			const castsText = JSON.stringify(storedCasts.map((cast) => ({ text: cast.text })));
 			const repliesText = JSON.stringify(storedReplies.map((reply) => ({ parentText: reply.parentText, text: reply.text })));
-			const styleProfilePromptResult = await runInitAgent(castsText, repliesText);
+			const styleProfilePromptResult = await runInitAgent(castsText, repliesText, creatorFid, 'reinit');
 			console.log(`[agent.service]: generated style_profile_prompt base on casts and replies for fid ${creatorFid}`);
 
 			// step 4: update or create agent in database
@@ -251,9 +253,11 @@ export const reinitializeAgent = async ({
 export const handleAskAgent = async ({
 	agent,
 	question,
+	conversation = {},
 }: {
   agent: Agent;
   question: string;
+  conversation?: Record<string, string>;
 }) => {
   
 	const styleProfilePrompt = agent.styleProfilePrompt;
@@ -268,17 +272,29 @@ export const handleAskAgent = async ({
 
   try {
     // Retrieve relevant context from Pinecone
-    const indexName = `xbtify-${agent.creatorFid}`;
-    const contextChunks = await retrieveContext(indexName, question, 3);
+    const contextChunks = await retrieveContext(agent.creatorFid, question, 2);
     const context = contextChunks.join('\n\n');
     console.log(`[agent.service]: Retrieved ${contextChunks.length} context chunks for question`);
 
-    // Call the assistant with the style profile, question, and context
-    const assistantResult = await runAssistant(styleProfilePrompt, question, context);
+    // Get agent username for assistant context
+    const agentUsername = agent.username || 'user';
+
+    // Call the assistant with the style profile, question, conversation, and context
+    const assistantResult = await runAssistant(styleProfilePrompt, question, agent.creatorFid, agentUsername, conversation, { text: context });
+    
+    // Handle "No reply needed" case
+    if (assistantResult.response === "No reply needed") {
+      console.log(`[agent.service]: No reply needed based on conversation analysis`);
+      return {
+        answer: null,
+        agentData: agent,
+      };
+    }
     
     // Parse the JSON response to extract the text field
     const parsedResponse = JSON.parse(assistantResult.response);
     console.log(`[agent.service]: assistantResult: ${parsedResponse.text}`);
+    console.log(`[agent.service]: confidence score: ${assistantResult.score_confidence}, reasoning: ${assistantResult.reasoning_confidence}`);
     return {
       answer: parsedResponse.text,
       agentData: agent,
