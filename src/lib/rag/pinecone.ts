@@ -22,15 +22,14 @@ function getPineconeClient(): Pinecone {
 /**
  * Creates a Pinecone index if it doesn't exist and uploads chunk embeddings
  * 
- * @param indexName - Name of the index (e.g., "xbtify-{creatorFid}")
- * @param chunks - Array of ChunkData objects containing text content
+ * @param chunks - Array of ChunkData objects containing text content and creatorFid
  * @param embeddings - Array of embedding vectors (768-dimensional)
  */
 export async function createAndUploadToPinecone(
-	indexName: string,
 	chunks: ChunkData[],
 	embeddings: number[][]
 ): Promise<void> {
+	const indexName = 'farcaster';
 	console.log(`[pinecone] Starting upload to index: ${indexName}`);
 	
 	if (chunks.length !== embeddings.length) {
@@ -69,11 +68,12 @@ export async function createAndUploadToPinecone(
 
 	// Prepare vectors for upsert
 	const vectors = chunks.map((chunk, idx) => ({
-		id: `chunk-${chunk.chunk_number}`,
+		id: `chunk-${chunk.creatorFid}-${chunk.chunk_number}`,
 		values: embeddings[idx],
 		metadata: {
 			text: chunk.text,
 			chunk_number: chunk.chunk_number,
+			creatorFid: chunk.creatorFid,
 		},
 	}));
 

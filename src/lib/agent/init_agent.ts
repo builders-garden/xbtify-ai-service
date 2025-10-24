@@ -324,6 +324,8 @@ function createInitAgentGraph() {
 export async function runInitAgent(
   casts: string,
   replies: string,
+  creatorFid: number,
+  apiType: 'init' | 'reinit',
   options?: { isFilePath?: boolean }
 ): Promise<{
     response: string;
@@ -359,7 +361,13 @@ export async function runInitAgent(
       const result = await graph.invoke({
         casts: processedCasts,
         replies: processedReplies
-      }, { callbacks: [langfuseHandler] });
+      }, { 
+        callbacks: [langfuseHandler], 
+        metadata: { 
+          langfuseSessionId: `xbtify-${creatorFid}`,
+          apiType: apiType
+        } 
+      });
       
       return {
         response: result.response || '',

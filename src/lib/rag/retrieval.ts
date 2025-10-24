@@ -35,17 +35,18 @@ class OpenAIEmbeddings {
 /**
  * Retrieves relevant context from Pinecone based on a query
  * 
- * @param indexName - Name of the Pinecone index (e.g., "xbtify-{creatorFid}")
+ * @param creatorFid - The Farcaster ID to filter results by
  * @param query - The user's question/query
  * @param topK - Number of top results to retrieve (default: 3)
  * @returns Promise resolving to array of relevant text chunks
  */
 export async function retrieveContext(
-	indexName: string,
+	creatorFid: number,
 	query: string,
 	topK = 3
 ): Promise<string[]> {
-	console.log(`[retrieval] Retrieving context for query from index: ${indexName}`);
+	const indexName = 'farcaster';
+	console.log(`[retrieval] Retrieving context for query from index: ${indexName} (creatorFid: ${creatorFid})`);
 	
 	try {
 		const pc = getPineconeClient();
@@ -59,8 +60,8 @@ export async function retrieveContext(
 			pineconeIndex: index,
 		});
 
-		// Perform similarity search
-		const results = await vectorStore.similaritySearch(query, topK);
+		// Perform similarity search with creatorFid filter
+		const results = await vectorStore.similaritySearch(query, topK, { creatorFid });
 
 		// Extract text content from results
 		const contexts = results.map((doc) => doc.pageContent);

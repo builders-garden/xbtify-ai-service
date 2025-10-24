@@ -70,6 +70,16 @@ export async function processNeynarWebhookJob(
 			`[neynar-webhook-job] Response for fid ${fid} ${response.answer}`,
 		);
 
+		// Skip posting if no reply is needed
+		if (!response.answer) {
+			console.log(
+				`[neynar-webhook-job] No reply needed for fid ${fid}, skipping cast`,
+			);
+			progress += increment;
+			await job.updateProgress(progress);
+			continue;
+		}
+
 		const parentHash = cast.hash;
 		const newCast = await postCastToFarcaster({
 			signerUuid: agent.signerUuid,

@@ -198,6 +198,7 @@ export const getAgentInfoController = async (req: Request, res: Response) => {
 
 const askAgentSchema = z.object({
 	question: z.string().min(1),
+	conversation: z.record(z.string(), z.string()).optional(),
 });
 
 export const handleAskAgentController = async (req: Request, res: Response) => {
@@ -225,6 +226,7 @@ export const handleAskAgentController = async (req: Request, res: Response) => {
 		const response = await handleAskAgent({
 			agent,
 			question: safeBody.question,
+			conversation: safeBody.conversation,
 		});
 
 		// Placeholder response
