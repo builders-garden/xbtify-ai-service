@@ -349,6 +349,7 @@ export const updateNeynarWebhookCastCreated = async ({
 		subscription: {
 			"cast.created": {
 				mentioned_fids: fids,
+				parent_author_fids: fids,
 			},
 		},
 	});

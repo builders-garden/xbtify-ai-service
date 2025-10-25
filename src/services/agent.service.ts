@@ -72,7 +72,6 @@ export const initAgent = async (data: AgentInitJobData) => {
 		});
 
 		// step 1: create farcaster user
-
 		const farcasterAccount = await createFarcasterAccount({
 			fname: newFname,
 			displayName: newDisplayName,
