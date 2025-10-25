@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import { processAgentReinitialization } from "../jobs/agentReinitialization.job.js";
 import { redisConnection } from "../lib/redis.js";
 import { QueueName } from "../types/enums.js";
-import { AgentReinitJobData, JobResult } from "../types/queue.type.js";
+import type { AgentReinitJobData, JobResult } from "../types/queue.type.js";
 
 export const agentReinitializationWorker = new Worker<
 	AgentReinitJobData,
@@ -16,7 +16,7 @@ export const agentReinitializationWorker = new Worker<
 			return {
 				status: "success",
 				message: result.message,
-			}
+			};
 		} catch (error) {
 			console.error("Error in agent job:", error);
 			throw error;

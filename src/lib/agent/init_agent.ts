@@ -1,14 +1,20 @@
-import { StateGraph, START, END } from '@langchain/langgraph';
-import { extractJSON, preprocessCastsFile, preprocessRepliesFile } from './utils.js';
-import { InitAgentState, llm } from './langgraph.js';
+import { HumanMessage } from "@langchain/core/messages";
+import { END, START, StateGraph } from "@langchain/langgraph";
 import { CallbackHandler } from "langfuse-langchain";
-import { HumanMessage } from '@langchain/core/messages';
+import { InitAgentState, llm } from "./langgraph.js";
+import {
+	extractJSON,
+	preprocessCastsFile,
+	preprocessRepliesFile,
+} from "./utils.js";
 
 // ReadCast Node - Analyzes casts to extract vocabulary and keywords
-async function readCastNode(state: typeof InitAgentState.State): Promise<Partial<typeof InitAgentState.State>> {
-  const { casts } = state;
-  console.log(`[ReadCastNode] Processing casts.`);
-  const prompt = `
+async function readCastNode(
+	state: typeof InitAgentState.State,
+): Promise<Partial<typeof InitAgentState.State>> {
+	const { casts } = state;
+	console.log("[ReadCastNode] Processing casts.");
+	const prompt = `
   You are a meticulous linguistic analyst AI agent. Your specific task is to read and analyze a collection of social media posts from a single user. 
   Based on this analysis, you will extract vocabulary patterns and identify key topics the user discusses.
   Your analysis must be objective, detailed, and directly derivable from the provided text.
@@ -75,74 +81,84 @@ async function readCastNode(state: typeof InitAgentState.State): Promise<Partial
   ${casts}
   `;
 
-  try {
-    const response = await llm.invoke([new HumanMessage(prompt)]);
-    const responseText = response.content.toString();
-    
-    // Try to extract JSON from the response
-    let extractedJSON = extractJSON(responseText);
-    
-    if (extractedJSON) {
-      console.log('[ReadCastNode] Successfully extracted JSON from first attempt.');
-      return {
-        castAnalysis: extractedJSON
-      };
-    }
-    
-    // First attempt failed, retry with more explicit prompt
-    console.log('[ReadCastNode] JSON extraction failed. Retrying with more explicit prompt...');
-    const retryPrompt = `${prompt}
+	try {
+		const response = await llm.invoke([new HumanMessage(prompt)]);
+		const responseText = response.content.toString();
+
+		// Try to extract JSON from the response
+		let extractedJSON = extractJSON(responseText);
+
+		if (extractedJSON) {
+			console.log(
+				"[ReadCastNode] Successfully extracted JSON from first attempt.",
+			);
+			return {
+				castAnalysis: extractedJSON,
+			};
+		}
+
+		// First attempt failed, retry with more explicit prompt
+		console.log(
+			"[ReadCastNode] JSON extraction failed. Retrying with more explicit prompt...",
+		);
+		const retryPrompt = `${prompt}
     
       IMPORTANT: Your previous response could not be parsed as valid JSON. Please respond with ONLY a valid JSON object, with no markdown formatting, no code blocks, no explanations, and no additional text. Start your response with { and end with }.`;
-    
-    try {
-      const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
-      const retryResponseText = retryResponse.content.toString();
-      
-      extractedJSON = extractJSON(retryResponseText);
-      
-      if (extractedJSON) {
-        console.log('[ReadCastNode] Successfully extracted JSON from retry attempt.');
-        return {
-          castAnalysis: extractedJSON
-        };
-      }
-      
-      // Both attempts failed, fall back to original response
-      console.log('[ReadCastNode] JSON extraction failed on retry. Using standard response.');
-      return {
-        castAnalysis: responseText
-      };
-    } catch (retryError) {
-      console.error('[ReadCastNode] Error on retry attempt:', retryError);
-      // If retry fails, return the original response
-      return {
-        castAnalysis: responseText
-      };
-    }
-  } catch (error) {
-    console.error('[ReadCastNode] Error generating answer:', error);
-    return {
-      castAnalysis: "I'm sorry, I couldn't process your request right now."
-    };
-  }
+
+		try {
+			const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
+			const retryResponseText = retryResponse.content.toString();
+
+			extractedJSON = extractJSON(retryResponseText);
+
+			if (extractedJSON) {
+				console.log(
+					"[ReadCastNode] Successfully extracted JSON from retry attempt.",
+				);
+				return {
+					castAnalysis: extractedJSON,
+				};
+			}
+
+			// Both attempts failed, fall back to original response
+			console.log(
+				"[ReadCastNode] JSON extraction failed on retry. Using standard response.",
+			);
+			return {
+				castAnalysis: responseText,
+			};
+		} catch (retryError) {
+			console.error("[ReadCastNode] Error on retry attempt:", retryError);
+			// If retry fails, return the original response
+			return {
+				castAnalysis: responseText,
+			};
+		}
+	} catch (error) {
+		console.error("[ReadCastNode] Error generating answer:", error);
+		return {
+			castAnalysis: "I'm sorry, I couldn't process your request right now.",
+		};
+	}
 }
 
 // ReadReplies Node - Analyzes replies to extract tone, syntax, and patterns per topic
-async function readRepliesNode(state: typeof InitAgentState.State): Promise<Partial<typeof InitAgentState.State>> {
-  const { replies, castAnalysis } = state;
-  console.log(`[ReadRepliesNode] Processing replies.`);
-  
-  // Parse castAnalysis to extract keywords
-  let keywords = {};
-  try {
-    const parsedCastAnalysis = JSON.parse(castAnalysis);
-    keywords = parsedCastAnalysis.keywords || {};
-  } catch (error) {
-    console.error('[ReadRepliesNode] Error parsing castAnalysis:', error);
-  }
-  
-  const prompt = `
+async function readRepliesNode(
+	state: typeof InitAgentState.State,
+): Promise<Partial<typeof InitAgentState.State>> {
+	const { replies, castAnalysis } = state;
+	console.log("[ReadRepliesNode] Processing replies.");
+
+	// Parse castAnalysis to extract keywords
+	let keywords = {};
+	try {
+		const parsedCastAnalysis = JSON.parse(castAnalysis);
+		keywords = parsedCastAnalysis.keywords || {};
+	} catch (error) {
+		console.error("[ReadRepliesNode] Error parsing castAnalysis:", error);
+	}
+
+	const prompt = `
   You are a meticulous linguistic analyst AI agent. Your specific task is to read and analyze a collection of replies from a single user on social media.
   Based on this analysis, you will extract the user's tone, syntax patterns, and identify how they respond to different topics.
   Your analysis must be objective, detailed, and directly derivable from the provided text.
@@ -217,172 +233,194 @@ async function readRepliesNode(state: typeof InitAgentState.State): Promise<Part
   ${replies}
   `;
 
-  try {
-    const response = await llm.invoke([new HumanMessage(prompt)]);
-    const responseText = response.content.toString();
-    
-    // Try to extract JSON from the response
-    let extractedJSON = extractJSON(responseText);
-    
-    if (extractedJSON) {
-      console.log('[ReadRepliesNode] Successfully extracted JSON from first attempt.');
-      return {
-        replyAnalysis: extractedJSON
-      };
-    }
-    
-    // First attempt failed, retry with more explicit prompt
-    console.log('[ReadRepliesNode] JSON extraction failed. Retrying with more explicit prompt...');
-    const retryPrompt = `${prompt}
+	try {
+		const response = await llm.invoke([new HumanMessage(prompt)]);
+		const responseText = response.content.toString();
+
+		// Try to extract JSON from the response
+		let extractedJSON = extractJSON(responseText);
+
+		if (extractedJSON) {
+			console.log(
+				"[ReadRepliesNode] Successfully extracted JSON from first attempt.",
+			);
+			return {
+				replyAnalysis: extractedJSON,
+			};
+		}
+
+		// First attempt failed, retry with more explicit prompt
+		console.log(
+			"[ReadRepliesNode] JSON extraction failed. Retrying with more explicit prompt...",
+		);
+		const retryPrompt = `${prompt}
     
       IMPORTANT: Your previous response could not be parsed as valid JSON. Please respond with ONLY a valid JSON object, with no markdown formatting, no code blocks, no explanations, and no additional text. Start your response with { and end with }.`;
-    
-    try {
-      const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
-      const retryResponseText = retryResponse.content.toString();
-      
-      extractedJSON = extractJSON(retryResponseText);
-      
-      if (extractedJSON) {
-        console.log('[ReadRepliesNode] Successfully extracted JSON from retry attempt.');
-        return {
-          replyAnalysis: extractedJSON
-        };
-      }
-      
-      // Both attempts failed, fall back to original response
-      console.log('[ReadRepliesNode] JSON extraction failed on retry. Using standard response.');
-      return {
-        replyAnalysis: responseText
-      };
-    } catch (retryError) {
-      console.error('[ReadRepliesNode] Error on retry attempt:', retryError);
-      // If retry fails, return the original response
-      return {
-        replyAnalysis: responseText
-      };
-    }
-  } catch (error) {
-    console.error('[ReadRepliesNode] Error generating answer:', error);
-    return {
-      replyAnalysis: "I'm sorry, I couldn't process your request right now."
-    };
-  }
+
+		try {
+			const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
+			const retryResponseText = retryResponse.content.toString();
+
+			extractedJSON = extractJSON(retryResponseText);
+
+			if (extractedJSON) {
+				console.log(
+					"[ReadRepliesNode] Successfully extracted JSON from retry attempt.",
+				);
+				return {
+					replyAnalysis: extractedJSON,
+				};
+			}
+
+			// Both attempts failed, fall back to original response
+			console.log(
+				"[ReadRepliesNode] JSON extraction failed on retry. Using standard response.",
+			);
+			return {
+				replyAnalysis: responseText,
+			};
+		} catch (retryError) {
+			console.error("[ReadRepliesNode] Error on retry attempt:", retryError);
+			// If retry fails, return the original response
+			return {
+				replyAnalysis: responseText,
+			};
+		}
+	} catch (error) {
+		console.error("[ReadRepliesNode] Error generating answer:", error);
+		return {
+			replyAnalysis: "I'm sorry, I couldn't process your request right now.",
+		};
+	}
 }
 
 // Constructor Node - Merges castAnalysis and replyAnalysis into final response
-async function constructorNode(state: typeof InitAgentState.State): Promise<Partial<typeof InitAgentState.State>> {
-  const { castAnalysis, replyAnalysis } = state;
-  console.log(`[ConstructorNode] Merging analysis results.`);
-  
-  try {
-    // Parse both JSON strings
-    const castData = JSON.parse(castAnalysis);
-    const replyData = JSON.parse(replyAnalysis);
-    
-    // Merge into a single object with all keys
-    const mergedData = {
-      vocabulary: castData.vocabulary,
-      keywords: castData.keywords,
-      tone: replyData.tone,
-      syntax: replyData.syntax,
-      patterns_per_topic: replyData.patterns_per_topic
-    };
-    
-    console.log('[ConstructorNode] Successfully merged analysis results.');
-    return {
-      response: JSON.stringify(mergedData, null, 2)
-    };
-  } catch (error) {
-    console.error('[ConstructorNode] Error merging analysis:', error);
-    // If parsing fails, return both analyses separately
-    return {
-      response: JSON.stringify({
-        castAnalysis: castAnalysis,
-        replyAnalysis: replyAnalysis,
-        error: "Could not merge analyses"
-      }, null, 2)
-    };
-  }
+async function constructorNode(
+	state: typeof InitAgentState.State,
+): Promise<Partial<typeof InitAgentState.State>> {
+	const { castAnalysis, replyAnalysis } = state;
+	console.log("[ConstructorNode] Merging analysis results.");
+
+	try {
+		// Parse both JSON strings
+		const castData = JSON.parse(castAnalysis);
+		const replyData = JSON.parse(replyAnalysis);
+
+		// Merge into a single object with all keys
+		const mergedData = {
+			vocabulary: castData.vocabulary,
+			keywords: castData.keywords,
+			tone: replyData.tone,
+			syntax: replyData.syntax,
+			patterns_per_topic: replyData.patterns_per_topic,
+		};
+
+		console.log("[ConstructorNode] Successfully merged analysis results.");
+		return {
+			response: JSON.stringify(mergedData, null, 2),
+		};
+	} catch (error) {
+		console.error("[ConstructorNode] Error merging analysis:", error);
+		// If parsing fails, return both analyses separately
+		return {
+			response: JSON.stringify(
+				{
+					castAnalysis: castAnalysis,
+					replyAnalysis: replyAnalysis,
+					error: "Could not merge analyses",
+				},
+				null,
+				2,
+			),
+		};
+	}
 }
 
 // Create the three-node LangGraph workflow
 function createInitAgentGraph() {
-  const workflow = new StateGraph(InitAgentState)
-    .addNode("readCast", readCastNode)
-    .addNode("readReplies", readRepliesNode)
-    .addNode("merge", constructorNode)
-    .addEdge(START, "readCast")
-    .addEdge("readCast", "readReplies")
-    .addEdge("readReplies", "merge")
-    .addEdge("merge", END);
+	const workflow = new StateGraph(InitAgentState)
+		.addNode("readCast", readCastNode)
+		.addNode("readReplies", readRepliesNode)
+		.addNode("merge", constructorNode)
+		.addEdge(START, "readCast")
+		.addEdge("readCast", "readReplies")
+		.addEdge("readReplies", "merge")
+		.addEdge("merge", END);
 
 	return workflow.compile();
 }
 
 // Main agent function that uses LangGraph
 export async function runInitAgent(
-  casts: string,
-  replies: string,
-  creatorFid: number,
-  apiType: 'init' | 'reinit',
-  options?: { isFilePath?: boolean }
+	casts: string,
+	replies: string,
+	creatorFid: number,
+	apiType: "init" | "reinit",
+	options?: { isFilePath?: boolean },
 ): Promise<{
-    response: string;
-  }> {
-    console.log(`[InitAgent] Starting agent...`);
-    
-    const langfuseHandler = new CallbackHandler({
-        secretKey: process.env.LANGFUSE_SECRET_KEY,
-        publicKey: process.env.LANGFUSE_PUBLIC_KEY,
-        baseUrl: process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com',
-      });
+	response: string;
+}> {
+	console.log("[InitAgent] Starting agent...");
 
-    try {
-      // Pre-process if inputs are file paths
-      let processedCasts = casts;
-      let processedReplies = replies;
-      
-      if (options?.isFilePath) {
-        console.log(`[InitAgent] Pre-processing casts file: ${casts}`);
-        processedCasts = preprocessCastsFile(casts);
-        
-        console.log(`[InitAgent] Pre-processing replies file: ${replies}`);
-        processedReplies = preprocessRepliesFile(replies);
-      }
-      
-      console.log(`[InitAgent] Processing casts with ${processedCasts.length} characters`);
-      console.log(`[InitAgent] Processing replies with ${processedReplies.length} characters`);
-      
-      // Create the graph
-      const graph = createInitAgentGraph();
-      
-      // Run the graph 
-      const result = await graph.invoke({
-        casts: processedCasts,
-        replies: processedReplies
-      }, { 
-        callbacks: [langfuseHandler], 
-        metadata: { 
-          langfuseSessionId: `xbtify-${creatorFid}`,
-          apiType: apiType
-        } 
-      });
-      
-      return {
-        response: result.response || '',
-      };
-    } catch (error) {
-      console.error('[InitAgent] Error running init agent:', error);
-      return {
-        response: "I'm sorry, there was an error processing your request. Please try again.",
-      };
-    } finally {
-      // Add this line to flush pending Langfuse operations
-      try {
-        await langfuseHandler.shutdownAsync();
-      } catch (error) {
-        console.error('[InitAgent] Error shutting down Langfuse:', error);
-      }
-    }
-  }
+	const langfuseHandler = new CallbackHandler({
+		secretKey: process.env.LANGFUSE_SECRET_KEY,
+		publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+		baseUrl: process.env.LANGFUSE_BASE_URL || "https://cloud.langfuse.com",
+	});
+
+	try {
+		// Pre-process if inputs are file paths
+		let processedCasts = casts;
+		let processedReplies = replies;
+
+		if (options?.isFilePath) {
+			console.log(`[InitAgent] Pre-processing casts file: ${casts}`);
+			processedCasts = preprocessCastsFile(casts);
+
+			console.log(`[InitAgent] Pre-processing replies file: ${replies}`);
+			processedReplies = preprocessRepliesFile(replies);
+		}
+
+		console.log(
+			`[InitAgent] Processing casts with ${processedCasts.length} characters`,
+		);
+		console.log(
+			`[InitAgent] Processing replies with ${processedReplies.length} characters`,
+		);
+
+		// Create the graph
+		const graph = createInitAgentGraph();
+
+		// Run the graph
+		const result = await graph.invoke(
+			{
+				casts: processedCasts,
+				replies: processedReplies,
+			},
+			{
+				callbacks: [langfuseHandler],
+				metadata: {
+					langfuseSessionId: `xbtify-${creatorFid}`,
+					apiType: apiType,
+				},
+			},
+		);
+
+		return {
+			response: result.response || "",
+		};
+	} catch (error) {
+		console.error("[InitAgent] Error running init agent:", error);
+		return {
+			response:
+				"I'm sorry, there was an error processing your request. Please try again.",
+		};
+	} finally {
+		// Add this line to flush pending Langfuse operations
+		try {
+			await langfuseHandler.shutdownAsync();
+		} catch (error) {
+			console.error("[InitAgent] Error shutting down Langfuse:", error);
+		}
+	}
+}

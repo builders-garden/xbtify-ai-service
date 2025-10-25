@@ -210,11 +210,11 @@ export type UpdateAgentCast = Partial<CreateAgentCast>;
 
 // User Metadata table
 export const userMetadataTable = pgTable("user_metadata", {
-  fid: integer("fid").notNull().unique(),
-  username: text("username").notNull(),
-  displayName: text("display_name"),
-  bio: text("bio"),
-  avatarUrl: text("avatar_url"),
+	fid: integer("fid").notNull().unique(),
+	username: text("username").notNull(),
+	displayName: text("display_name"),
+	bio: text("bio"),
+	avatarUrl: text("avatar_url"),
 });
 
 export type UserMetadata = typeof userMetadataTable.$inferSelect;
@@ -274,12 +274,12 @@ export const groupMemberRelations = relations(groupMemberTable, ({ one }) => ({
 }));
 
 export const agentCastRelations = relations(agentCastTable, ({ one }) => ({
-  agent: one(agentTable, {
-    fields: [agentCastTable.agentFid],
-    references: [agentTable.fid],
-  }),
-  parentUserMetadata: one(userMetadataTable, {
-    fields: [agentCastTable.parentCastAuthorFid],
-    references: [userMetadataTable.fid],
-  }),
+	agent: one(agentTable, {
+		fields: [agentCastTable.agentFid],
+		references: [agentTable.fid],
+	}),
+	parentUserMetadata: one(userMetadataTable, {
+		fields: [agentCastTable.parentCastAuthorFid],
+		references: [userMetadataTable.fid],
+	}),
 }));

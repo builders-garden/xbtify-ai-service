@@ -4,6 +4,7 @@ import {
 	createAgentCast,
 	getAgentByCreatorFidOrFid,
 } from "../lib/database/queries/agent.query.js";
+import { upsertUserMetadata } from "../lib/database/queries/user-metadata.query.js";
 import {
 	// sendMessageToUserViaNeynar,
 	// sendMessageToUserViaNeynarRaw,
@@ -11,7 +12,6 @@ import {
 } from "../lib/neynar.js";
 import { handleAskAgent } from "../services/agent.service.js";
 import type { JobResult, NeynarWebhookJobData } from "../types/queue.type.js";
-import { upsertUserMetadata } from "../lib/database/queries/user-metadata.query.js";
 
 /**
  * Process neynar webhook - handle neynar webhook for any farcaster user

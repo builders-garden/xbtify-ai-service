@@ -47,7 +47,7 @@ const envSchema = z.object({
 	LANGFUSE_SECRET_KEY: z.string().min(1),
 	LANGFUSE_PUBLIC_KEY: z.string().min(1),
 	LANGFUSE_BASE_URL: z.string().url(),
-	
+
 	// Imagekit
 	IMAGEKIT_PUBLIC_KEY: z.string().min(1),
 	IMAGEKIT_PRIVATE_KEY: z.string().min(1),
@@ -58,7 +58,6 @@ const envSchema = z.object({
 
 	// OpenAI
 	OPENAI_API_KEY: z.string().min(1),
-
 });
 
 export type Env = z.infer<typeof envSchema>;

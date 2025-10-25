@@ -1,23 +1,27 @@
-import { StateGraph, START, END } from '@langchain/langgraph';
-import { extractJSON } from './utils.js';
-import { AssistantAgentState, llm } from './langgraph.js';
+import { HumanMessage } from "@langchain/core/messages";
+import { END, START, StateGraph } from "@langchain/langgraph";
 import { CallbackHandler } from "langfuse-langchain";
-import { HumanMessage } from '@langchain/core/messages';
+import { AssistantAgentState, llm } from "./langgraph.js";
+import { extractJSON } from "./utils.js";
 
 // DecideIfReply Node - Determines if a reply is needed
-async function decideIfReplyNode(state: typeof AssistantAgentState.State): Promise<Partial<typeof AssistantAgentState.State>> {
-  const { question, conversation, agentUsername } = state;
-  console.log(`[DecideIfReplyNode] Evaluating if reply is needed for question: ${question}`);
-  
-  // Derive creator username by removing last 3 characters from agent username
-  const creatorUsername = agentUsername.slice(0, -3);
-  
-  // Format conversation for the prompt
-  const conversationText = Object.entries(conversation || {})
-    .map(([key, value]) => `[${key}]: ${value}`)
-    .join('\n\n');
-  
-  const prompt = `
+async function decideIfReplyNode(
+	state: typeof AssistantAgentState.State,
+): Promise<Partial<typeof AssistantAgentState.State>> {
+	const { question, conversation, agentUsername } = state;
+	console.log(
+		`[DecideIfReplyNode] Evaluating if reply is needed for question: ${question}`,
+	);
+
+	// Derive creator username by removing last 3 characters from agent username
+	const creatorUsername = agentUsername.slice(0, -3);
+
+	// Format conversation for the prompt
+	const conversationText = Object.entries(conversation || {})
+		.map(([key, value]) => `[${key}]: ${value}`)
+		.join("\n\n");
+
+	const prompt = `
   You are a conversation analyzer that determines whether a meaningful reply is needed.
   
   ### CONTEXT ###
@@ -60,7 +64,7 @@ async function decideIfReplyNode(state: typeof AssistantAgentState.State): Promi
   
   ### CONVERSATION HISTORY ###
   
-  ${conversationText || 'No conversation history available.'}
+  ${conversationText || "No conversation history available."}
   
   ### CURRENT QUESTION ###
   
@@ -69,76 +73,95 @@ async function decideIfReplyNode(state: typeof AssistantAgentState.State): Promi
   Remember: Be strict about avoiding redundant responses. If the question is clearly answered, return "no". Consider whether @${creatorUsername}'s input would add value to the conversation.
   `;
 
-  try {
-    const response = await llm.invoke([new HumanMessage(prompt)]);
-    const responseText = response.content.toString();
-    
-    // Try to extract JSON from the response
-    let extractedJSON = extractJSON(responseText);
-    
-    if (extractedJSON) {
-      console.log('[DecideIfReplyNode] Successfully extracted JSON from first attempt.');
-      const parsed = JSON.parse(extractedJSON);
-      const decision = parsed.decision?.toLowerCase() === 'yes';
-      const reasoning = parsed.reasoning || 'No reasoning provided';
-      console.log('[DecideIfReplyNode] Decision:', decision ? 'Reply needed' : 'No reply needed');
-      console.log('[DecideIfReplyNode] Reasoning:', reasoning);
-      return {
-        to_reply: decision
-      };
-    }
-    
-    // First attempt failed, retry with more explicit prompt
-    console.log('[DecideIfReplyNode] JSON extraction failed. Retrying with more explicit prompt...');
-    const retryPrompt = `${prompt}
+	try {
+		const response = await llm.invoke([new HumanMessage(prompt)]);
+		const responseText = response.content.toString();
+
+		// Try to extract JSON from the response
+		let extractedJSON = extractJSON(responseText);
+
+		if (extractedJSON) {
+			console.log(
+				"[DecideIfReplyNode] Successfully extracted JSON from first attempt.",
+			);
+			const parsed = JSON.parse(extractedJSON);
+			const decision = parsed.decision?.toLowerCase() === "yes";
+			const reasoning = parsed.reasoning || "No reasoning provided";
+			console.log(
+				"[DecideIfReplyNode] Decision:",
+				decision ? "Reply needed" : "No reply needed",
+			);
+			console.log("[DecideIfReplyNode] Reasoning:", reasoning);
+			return {
+				to_reply: decision,
+			};
+		}
+
+		// First attempt failed, retry with more explicit prompt
+		console.log(
+			"[DecideIfReplyNode] JSON extraction failed. Retrying with more explicit prompt...",
+		);
+		const retryPrompt = `${prompt}
     
     IMPORTANT: Your previous response could not be parsed as valid JSON. Please respond with ONLY a valid JSON object with "decision" and "reasoning" fields, with no markdown formatting, no code blocks, no explanations, and no additional text. Start your response with { and end with }.`;
-    
-    try {
-      const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
-      const retryResponseText = retryResponse.content.toString();
-      
-      extractedJSON = extractJSON(retryResponseText);
-      
-      if (extractedJSON) {
-        console.log('[DecideIfReplyNode] Successfully extracted JSON from retry attempt.');
-        const parsed = JSON.parse(extractedJSON);
-        const decision = parsed.decision?.toLowerCase() === 'yes';
-        const reasoning = parsed.reasoning || 'No reasoning provided';
-        console.log('[DecideIfReplyNode] Decision:', decision ? 'Reply needed' : 'No reply needed');
-        console.log('[DecideIfReplyNode] Reasoning:', reasoning);
-        return {
-          to_reply: decision
-        };
-      }
-      
-      // Both attempts failed, default to replying (safer option)
-      console.log('[DecideIfReplyNode] JSON extraction failed on retry. Defaulting to reply.');
-      return {
-        to_reply: true
-      };
-    } catch (retryError) {
-      console.error('[DecideIfReplyNode] Error on retry attempt:', retryError);
-      return {
-        to_reply: true
-      };
-    }
-  } catch (error) {
-    console.error('[DecideIfReplyNode] Error evaluating reply decision:', error);
-    return {
-      to_reply: true
-    };
-  }
+
+		try {
+			const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
+			const retryResponseText = retryResponse.content.toString();
+
+			extractedJSON = extractJSON(retryResponseText);
+
+			if (extractedJSON) {
+				console.log(
+					"[DecideIfReplyNode] Successfully extracted JSON from retry attempt.",
+				);
+				const parsed = JSON.parse(extractedJSON);
+				const decision = parsed.decision?.toLowerCase() === "yes";
+				const reasoning = parsed.reasoning || "No reasoning provided";
+				console.log(
+					"[DecideIfReplyNode] Decision:",
+					decision ? "Reply needed" : "No reply needed",
+				);
+				console.log("[DecideIfReplyNode] Reasoning:", reasoning);
+				return {
+					to_reply: decision,
+				};
+			}
+
+			// Both attempts failed, default to replying (safer option)
+			console.log(
+				"[DecideIfReplyNode] JSON extraction failed on retry. Defaulting to reply.",
+			);
+			return {
+				to_reply: true,
+			};
+		} catch (retryError) {
+			console.error("[DecideIfReplyNode] Error on retry attempt:", retryError);
+			return {
+				to_reply: true,
+			};
+		}
+	} catch (error) {
+		console.error(
+			"[DecideIfReplyNode] Error evaluating reply decision:",
+			error,
+		);
+		return {
+			to_reply: true,
+		};
+	}
 }
 
 // AnswerQuestion Node - Generates styled answer based on style profile
-async function answerQuestionNode(state: typeof AssistantAgentState.State): Promise<Partial<typeof AssistantAgentState.State>> {
-  const { styleProfile, question, context, agentUsername} = state;
-  console.log(`[AnswerQuestionNode] Processing question: ${question}`);
+async function answerQuestionNode(
+	state: typeof AssistantAgentState.State,
+): Promise<Partial<typeof AssistantAgentState.State>> {
+	const { styleProfile, question, context, agentUsername } = state;
+	console.log(`[AnswerQuestionNode] Processing question: ${question}`);
 
-  const creatorUsername = agentUsername.slice(0, -3);
-  
-  const prompt = `
+	const creatorUsername = agentUsername.slice(0, -3);
+
+	const prompt = `
   You are an AI assistant that answers questions while mimicking a specific user's communication style.
   You have been provided with a detailed STYLE PROFILE that captures how a particular user communicates.
 
@@ -193,7 +216,7 @@ async function answerQuestionNode(state: typeof AssistantAgentState.State): Prom
 
   ### RELEVANT CONTEXT FROM USER'S CASTS ###
 
-  ${context?.text || 'No specific context available.'}
+  ${context?.text || "No specific context available."}
 
   ### QUESTION ###
 
@@ -204,79 +227,91 @@ async function answerQuestionNode(state: typeof AssistantAgentState.State): Prom
   
   `;
 
-  try {
-    const response = await llm.invoke([new HumanMessage(prompt)]);
-    const responseText = response.content.toString();
-    
-    // Try to extract JSON from the response
-    let extractedJSON = extractJSON(responseText);
-    
-    if (extractedJSON) {
-      console.log('[AnswerQuestionNode] Successfully extracted JSON from first attempt.');
-      console.log('[AnswerQuestionNode] Generated answer:', extractedJSON);
-      return {
-        response: extractedJSON
-      };
-    }
-    
-    // First attempt failed, retry with more explicit prompt
-    console.log('[AnswerQuestionNode] JSON extraction failed. Retrying with more explicit prompt...');
-    const retryPrompt = `${prompt}
+	try {
+		const response = await llm.invoke([new HumanMessage(prompt)]);
+		const responseText = response.content.toString();
+
+		// Try to extract JSON from the response
+		let extractedJSON = extractJSON(responseText);
+
+		if (extractedJSON) {
+			console.log(
+				"[AnswerQuestionNode] Successfully extracted JSON from first attempt.",
+			);
+			console.log("[AnswerQuestionNode] Generated answer:", extractedJSON);
+			return {
+				response: extractedJSON,
+			};
+		}
+
+		// First attempt failed, retry with more explicit prompt
+		console.log(
+			"[AnswerQuestionNode] JSON extraction failed. Retrying with more explicit prompt...",
+		);
+		const retryPrompt = `${prompt}
     
     IMPORTANT: Your previous response could not be parsed as valid JSON. Please respond with ONLY a valid JSON object with a "text" field, with no markdown formatting, no code blocks, no explanations, and no additional text. Start your response with { and end with }.`;
-    
-    try {
-      const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
-      const retryResponseText = retryResponse.content.toString();
-      
-      extractedJSON = extractJSON(retryResponseText);
-      
-      if (extractedJSON) {
-        console.log('[AnswerQuestionNode] Successfully extracted JSON from retry attempt.');
-        console.log('[AnswerQuestionNode] Generated answer:', extractedJSON);
-        return {
-          response: extractedJSON
-        };
-      }
-      
-      // Both attempts failed, create a fallback JSON response
-      console.log('[AnswerQuestionNode] JSON extraction failed on retry. Creating fallback response.');
-      return {
-        response: JSON.stringify({ text: retryResponseText })
-      };
-    } catch (retryError) {
-      console.error('[AnswerQuestionNode] Error on retry attempt:', retryError);
-      // If retry fails, return the original response wrapped in JSON
-      return {
-        response: JSON.stringify({ text: responseText })
-      };
-    }
-  } catch (error) {
-    console.error('[AnswerQuestionNode] Error generating answer:', error);
-    return {
-      response: JSON.stringify({ text: "I'm sorry, I couldn't process your request right now." })
-    };
-  }
+
+		try {
+			const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
+			const retryResponseText = retryResponse.content.toString();
+
+			extractedJSON = extractJSON(retryResponseText);
+
+			if (extractedJSON) {
+				console.log(
+					"[AnswerQuestionNode] Successfully extracted JSON from retry attempt.",
+				);
+				console.log("[AnswerQuestionNode] Generated answer:", extractedJSON);
+				return {
+					response: extractedJSON,
+				};
+			}
+
+			// Both attempts failed, create a fallback JSON response
+			console.log(
+				"[AnswerQuestionNode] JSON extraction failed on retry. Creating fallback response.",
+			);
+			return {
+				response: JSON.stringify({ text: retryResponseText }),
+			};
+		} catch (retryError) {
+			console.error("[AnswerQuestionNode] Error on retry attempt:", retryError);
+			// If retry fails, return the original response wrapped in JSON
+			return {
+				response: JSON.stringify({ text: responseText }),
+			};
+		}
+	} catch (error) {
+		console.error("[AnswerQuestionNode] Error generating answer:", error);
+		return {
+			response: JSON.stringify({
+				text: "I'm sorry, I couldn't process your request right now.",
+			}),
+		};
+	}
 }
 
 // StyleRefiner Node - Cleans up GPT-generated artifacts
-async function styleRefinerNode(state: typeof AssistantAgentState.State): Promise<Partial<typeof AssistantAgentState.State>> {
-  const { response, agentUsername } = state;
+async function styleRefinerNode(
+	state: typeof AssistantAgentState.State,
+): Promise<Partial<typeof AssistantAgentState.State>> {
+	const { response, agentUsername } = state;
 
-  const creatorUsername = agentUsername.slice(0, -3);
-  console.log(`[StyleRefinerNode] Refining answer style`);
-  
-  // Parse the current response to get the text
-  let currentText = '';
-  try {
-    const parsedResponse = JSON.parse(response);
-    currentText = parsedResponse.text || '';
-  } catch (error) {
-    console.error('[StyleRefinerNode] Error parsing response:', error);
-    currentText = response;
-  }
-  
-  const prompt = `
+	const creatorUsername = agentUsername.slice(0, -3);
+	console.log("[StyleRefinerNode] Refining answer style");
+
+	// Parse the current response to get the text
+	let currentText = "";
+	try {
+		const parsedResponse = JSON.parse(response);
+		currentText = parsedResponse.text || "";
+	} catch (error) {
+		console.error("[StyleRefinerNode] Error parsing response:", error);
+		currentText = response;
+	}
+
+	const prompt = `
   You are a style editor that removes artificial intelligence artifacts from text to make it sound more human and natural.
   
   ### YOUR TASK ###
@@ -326,73 +361,85 @@ async function styleRefinerNode(state: typeof AssistantAgentState.State): Promis
   
   `;
 
-  try {
-    const response = await llm.invoke([new HumanMessage(prompt)]);
-    const responseText = response.content.toString();
-    
-    // Try to extract JSON from the response
-    let extractedJSON = extractJSON(responseText);
-    
-    if (extractedJSON) {
-      console.log('[StyleRefinerNode] Successfully extracted JSON from first attempt.');
-      console.log('[StyleRefinerNode] Refined answer:', extractedJSON);
-      return {
-        response: extractedJSON
-      };
-    }
-    
-    // First attempt failed, retry with more explicit prompt
-    console.log('[StyleRefinerNode] JSON extraction failed. Retrying with more explicit prompt...');
-    const retryPrompt = `${prompt}
+	try {
+		const response = await llm.invoke([new HumanMessage(prompt)]);
+		const responseText = response.content.toString();
+
+		// Try to extract JSON from the response
+		let extractedJSON = extractJSON(responseText);
+
+		if (extractedJSON) {
+			console.log(
+				"[StyleRefinerNode] Successfully extracted JSON from first attempt.",
+			);
+			console.log("[StyleRefinerNode] Refined answer:", extractedJSON);
+			return {
+				response: extractedJSON,
+			};
+		}
+
+		// First attempt failed, retry with more explicit prompt
+		console.log(
+			"[StyleRefinerNode] JSON extraction failed. Retrying with more explicit prompt...",
+		);
+		const retryPrompt = `${prompt}
     
     IMPORTANT: Your previous response could not be parsed as valid JSON. Please respond with ONLY a valid JSON object with a "text" field, with no markdown formatting, no code blocks, no explanations, and no additional text. Start your response with { and end with }.`;
-    
-    try {
-      const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
-      const retryResponseText = retryResponse.content.toString();
-      
-      extractedJSON = extractJSON(retryResponseText);
-      
-      if (extractedJSON) {
-        console.log('[StyleRefinerNode] Successfully extracted JSON from retry attempt.');
-        console.log('[StyleRefinerNode] Refined answer:', extractedJSON);
-        return {
-          response: extractedJSON
-        };
-      }
-      
-      // Both attempts failed, create a fallback JSON response
-      console.log('[StyleRefinerNode] JSON extraction failed on retry. Creating fallback response.');
-      return {
-        response: JSON.stringify({ text: retryResponseText })
-      };
-    } catch (retryError) {
-      console.error('[StyleRefinerNode] Error on retry attempt:', retryError);
-      // If retry fails, return the original response
-      return {
-        response: JSON.stringify({ text: currentText })
-      };
-    }
-  } catch (error) {
-    console.error('[StyleRefinerNode] Error refining style:', error);
-    // Return original response on error
-    return {
-      response: JSON.stringify({ text: currentText })
-    };
-  }
+
+		try {
+			const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
+			const retryResponseText = retryResponse.content.toString();
+
+			extractedJSON = extractJSON(retryResponseText);
+
+			if (extractedJSON) {
+				console.log(
+					"[StyleRefinerNode] Successfully extracted JSON from retry attempt.",
+				);
+				console.log("[StyleRefinerNode] Refined answer:", extractedJSON);
+				return {
+					response: extractedJSON,
+				};
+			}
+
+			// Both attempts failed, create a fallback JSON response
+			console.log(
+				"[StyleRefinerNode] JSON extraction failed on retry. Creating fallback response.",
+			);
+			return {
+				response: JSON.stringify({ text: retryResponseText }),
+			};
+		} catch (retryError) {
+			console.error("[StyleRefinerNode] Error on retry attempt:", retryError);
+			// If retry fails, return the original response
+			return {
+				response: JSON.stringify({ text: currentText }),
+			};
+		}
+	} catch (error) {
+		console.error("[StyleRefinerNode] Error refining style:", error);
+		// Return original response on error
+		return {
+			response: JSON.stringify({ text: currentText }),
+		};
+	}
 }
 
 // DecideIfDumb Node - Determines if the question is a simple social comment
-async function decideIfDumbNode(state: typeof AssistantAgentState.State): Promise<Partial<typeof AssistantAgentState.State>> {
-  const { question, conversation } = state;
-  console.log(`[DecideIfDumbNode] Evaluating if question is a simple social comment`);
-  
-  // Format conversation for the prompt
-  const conversationText = Object.entries(conversation || {})
-    .map(([key, value]) => `[${key}]: ${value}`)
-    .join('\n');
-  
-  const prompt = `
+async function decideIfDumbNode(
+	state: typeof AssistantAgentState.State,
+): Promise<Partial<typeof AssistantAgentState.State>> {
+	const { question, conversation } = state;
+	console.log(
+		"[DecideIfDumbNode] Evaluating if question is a simple social comment",
+	);
+
+	// Format conversation for the prompt
+	const conversationText = Object.entries(conversation || {})
+		.map(([key, value]) => `[${key}]: ${value}`)
+		.join("\n");
+
+	const prompt = `
   You are a question classifier that determines whether a question is a simple social comment or a meaningful question.
   
   ### YOUR TASK ###
@@ -432,7 +479,7 @@ async function decideIfDumbNode(state: typeof AssistantAgentState.State): Promis
   
   ### CONVERSATION HISTORY ###
   
-  ${conversationText || 'No conversation history available.'}
+  ${conversationText || "No conversation history available."}
   
   ### QUESTION ###
   
@@ -442,93 +489,109 @@ async function decideIfDumbNode(state: typeof AssistantAgentState.State): Promis
   - Only classify as "yes" (simple social comment) if the question truly requires no substantial analysis or information.
   `;
 
-  try {
-    const response = await llm.invoke([new HumanMessage(prompt)]);
-    const responseText = response.content.toString();
-    
-    // Try to extract JSON from the response
-    let extractedJSON = extractJSON(responseText);
-    
-    if (extractedJSON) {
-      console.log('[DecideIfDumbNode] Successfully extracted JSON from first attempt.');
-      const parsed = JSON.parse(extractedJSON);
-      const decision = parsed.decision?.toLowerCase() === 'yes';
-      const reasoning = parsed.reasoning || 'No reasoning provided';
-      console.log('[DecideIfDumbNode] Decision:', decision ? 'Simple social comment' : 'Meaningful question');
-      console.log('[DecideIfDumbNode] Reasoning:', reasoning);
-      return {
-        is_dumb: decision
-      };
-    }
-    
-    // First attempt failed, retry with more explicit prompt
-    console.log('[DecideIfDumbNode] JSON extraction failed. Retrying with more explicit prompt...');
-    const retryPrompt = `${prompt}
+	try {
+		const response = await llm.invoke([new HumanMessage(prompt)]);
+		const responseText = response.content.toString();
+
+		// Try to extract JSON from the response
+		let extractedJSON = extractJSON(responseText);
+
+		if (extractedJSON) {
+			console.log(
+				"[DecideIfDumbNode] Successfully extracted JSON from first attempt.",
+			);
+			const parsed = JSON.parse(extractedJSON);
+			const decision = parsed.decision?.toLowerCase() === "yes";
+			const reasoning = parsed.reasoning || "No reasoning provided";
+			console.log(
+				"[DecideIfDumbNode] Decision:",
+				decision ? "Simple social comment" : "Meaningful question",
+			);
+			console.log("[DecideIfDumbNode] Reasoning:", reasoning);
+			return {
+				is_dumb: decision,
+			};
+		}
+
+		// First attempt failed, retry with more explicit prompt
+		console.log(
+			"[DecideIfDumbNode] JSON extraction failed. Retrying with more explicit prompt...",
+		);
+		const retryPrompt = `${prompt}
     
     IMPORTANT: Your previous response could not be parsed as valid JSON. Please respond with ONLY a valid JSON object with "decision" and "reasoning" fields, with no markdown formatting, no code blocks, no explanations, and no additional text. Start your response with { and end with }.`;
-    
-    try {
-      const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
-      const retryResponseText = retryResponse.content.toString();
-      
-      extractedJSON = extractJSON(retryResponseText);
-      
-      if (extractedJSON) {
-        console.log('[DecideIfDumbNode] Successfully extracted JSON from retry attempt.');
-        const parsed = JSON.parse(extractedJSON);
-        const decision = parsed.decision?.toLowerCase() === 'yes';
-        const reasoning = parsed.reasoning || 'No reasoning provided';
-        console.log('[DecideIfDumbNode] Decision:', decision ? 'Simple social comment' : 'Meaningful question');
-        console.log('[DecideIfDumbNode] Reasoning:', reasoning);
-        return {
-          is_dumb: decision
-        };
-      }
-      
-      // Both attempts failed, default to not simple (safer to do full analysis)
-      console.log('[DecideIfDumbNode] JSON extraction failed on retry. Defaulting to meaningful question.');
-      return {
-        is_dumb: false
-      };
-    } catch (retryError) {
-      console.error('[DecideIfDumbNode] Error on retry attempt:', retryError);
-      return {
-        is_dumb: false
-      };
-    }
-  } catch (error) {
-    console.error('[DecideIfDumbNode] Error evaluating question type:', error);
-    return {
-      is_dumb: false
-    };
-  }
+
+		try {
+			const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
+			const retryResponseText = retryResponse.content.toString();
+
+			extractedJSON = extractJSON(retryResponseText);
+
+			if (extractedJSON) {
+				console.log(
+					"[DecideIfDumbNode] Successfully extracted JSON from retry attempt.",
+				);
+				const parsed = JSON.parse(extractedJSON);
+				const decision = parsed.decision?.toLowerCase() === "yes";
+				const reasoning = parsed.reasoning || "No reasoning provided";
+				console.log(
+					"[DecideIfDumbNode] Decision:",
+					decision ? "Simple social comment" : "Meaningful question",
+				);
+				console.log("[DecideIfDumbNode] Reasoning:", reasoning);
+				return {
+					is_dumb: decision,
+				};
+			}
+
+			// Both attempts failed, default to not simple (safer to do full analysis)
+			console.log(
+				"[DecideIfDumbNode] JSON extraction failed on retry. Defaulting to meaningful question.",
+			);
+			return {
+				is_dumb: false,
+			};
+		} catch (retryError) {
+			console.error("[DecideIfDumbNode] Error on retry attempt:", retryError);
+			return {
+				is_dumb: false,
+			};
+		}
+	} catch (error) {
+		console.error("[DecideIfDumbNode] Error evaluating question type:", error);
+		return {
+			is_dumb: false,
+		};
+	}
 }
 
 // ConfidenceScorer Node - Evaluates answer quality and confidence
-async function confidenceScorerNode(state: typeof AssistantAgentState.State): Promise<Partial<typeof AssistantAgentState.State>> {
-  const { styleProfile, question, response, context } = state;
-  console.log(`[ConfidenceScorerNode] Evaluating answer confidence`);
-  
-  // Parse the current response to get the text
-  let answerText = '';
-  let keywords = 'No keywords available.';
-  try {
-    const parsedResponse = JSON.parse(response);
-    answerText = parsedResponse.text || '';
-  } catch (error) {
-    console.error('[ConfidenceScorerNode] Error parsing response:', error);
-    answerText = response;
-  }
+async function confidenceScorerNode(
+	state: typeof AssistantAgentState.State,
+): Promise<Partial<typeof AssistantAgentState.State>> {
+	const { styleProfile, question, response, context } = state;
+	console.log("[ConfidenceScorerNode] Evaluating answer confidence");
 
-  try {
-    const parsedKeywords = JSON.parse(styleProfile);
-    keywords = parsedKeywords.keywords || '';
-  } catch (error) {
-    console.error('[ConfidenceScorerNode] Error parsing styleProfile:', error);
-    keywords = 'No keywords available.';
-  }
-  
-  const prompt = `
+	// Parse the current response to get the text
+	let answerText = "";
+	let keywords = "No keywords available.";
+	try {
+		const parsedResponse = JSON.parse(response);
+		answerText = parsedResponse.text || "";
+	} catch (error) {
+		console.error("[ConfidenceScorerNode] Error parsing response:", error);
+		answerText = response;
+	}
+
+	try {
+		const parsedKeywords = JSON.parse(styleProfile);
+		keywords = parsedKeywords.keywords || "";
+	} catch (error) {
+		console.error("[ConfidenceScorerNode] Error parsing styleProfile:", error);
+		keywords = "No keywords available.";
+	}
+
+	const prompt = `
   You are an answer quality evaluator. Your task is to assess how well an answer is grounded in the provided context.
   
   ### YOUR TASK ###
@@ -580,7 +643,7 @@ async function confidenceScorerNode(state: typeof AssistantAgentState.State): Pr
   
   ### AVAILABLE CONTEXT ###
   
-  ${context?.text || 'No specific context available.'}
+  ${context?.text || "No specific context available."}
   
   ### GENERATED ANSWER ###
   
@@ -592,88 +655,113 @@ async function confidenceScorerNode(state: typeof AssistantAgentState.State): Pr
   - The reasoning should be 1-2 sentences maximum.
   `;
 
-  try {
-    const response = await llm.invoke([new HumanMessage(prompt)]);
-    const responseText = response.content.toString();
-    
-    // Try to extract JSON from the response
-    let extractedJSON = extractJSON(responseText);
-    
-    if (extractedJSON) {
-      console.log('[ConfidenceScorerNode] Successfully extracted JSON from first attempt.');
-      const parsed = JSON.parse(extractedJSON);
-      const score = parsed.score || 'medium';
-      console.log('[ConfidenceScorerNode] Confidence Score:', score);
-      console.log('[ConfidenceScorerNode] Reasoning:', parsed.reasoning || 'Unable to evaluate confidence.');
-      return {
-        scoreConfidence: score,
-        reasoningConfidence: parsed.reasoning || 'Unable to evaluate confidence.'
-      };
-    }
-    
-    // First attempt failed, retry with more explicit prompt
-    console.log('[ConfidenceScorerNode] JSON extraction failed. Retrying with more explicit prompt...');
-    const retryPrompt = `${prompt}
+	try {
+		const response = await llm.invoke([new HumanMessage(prompt)]);
+		const responseText = response.content.toString();
+
+		// Try to extract JSON from the response
+		let extractedJSON = extractJSON(responseText);
+
+		if (extractedJSON) {
+			console.log(
+				"[ConfidenceScorerNode] Successfully extracted JSON from first attempt.",
+			);
+			const parsed = JSON.parse(extractedJSON);
+			const score = parsed.score || "medium";
+			console.log("[ConfidenceScorerNode] Confidence Score:", score);
+			console.log(
+				"[ConfidenceScorerNode] Reasoning:",
+				parsed.reasoning || "Unable to evaluate confidence.",
+			);
+			return {
+				scoreConfidence: score,
+				reasoningConfidence:
+					parsed.reasoning || "Unable to evaluate confidence.",
+			};
+		}
+
+		// First attempt failed, retry with more explicit prompt
+		console.log(
+			"[ConfidenceScorerNode] JSON extraction failed. Retrying with more explicit prompt...",
+		);
+		const retryPrompt = `${prompt}
     
     IMPORTANT: Your previous response could not be parsed as valid JSON. Please respond with ONLY a valid JSON object with "score" (string: "high", "medium", or "low") and "reasoning" (string) fields, with no markdown formatting, no code blocks, no explanations, and no additional text. Start your response with { and end with }.`;
-    
-    try {
-      const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
-      const retryResponseText = retryResponse.content.toString();
-      
-      extractedJSON = extractJSON(retryResponseText);
-      
-      if (extractedJSON) {
-        console.log('[ConfidenceScorerNode] Successfully extracted JSON from retry attempt.');
-        const parsed = JSON.parse(extractedJSON);
-        const score = parsed.score || 'medium';
-        console.log('[ConfidenceScorerNode] Confidence Score:', score);
-        console.log('[ConfidenceScorerNode] Reasoning:', parsed.reasoning || 'Unable to evaluate confidence.');
-        return {
-          scoreConfidence: score,
-          reasoningConfidence: parsed.reasoning || 'Unable to evaluate confidence.'
-        };
-      }
-      
-      // Both attempts failed, return default values
-      console.log('[ConfidenceScorerNode] JSON extraction failed on retry. Using default values.');
-      return {
-        scoreConfidence: undefined,
-        reasoningConfidence: undefined
-      };
-    } catch (retryError) {
-      console.error('[ConfidenceScorerNode] Error on retry attempt:', retryError);
-      return {
-        scoreConfidence: undefined,
-        reasoningConfidence: undefined
-      };
-    }
-  } catch (error) {
-    console.error('[ConfidenceScorerNode] Error evaluating confidence:', error);
-    return {
-      scoreConfidence: undefined,
-      reasoningConfidence: undefined
-    };
-  }
+
+		try {
+			const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
+			const retryResponseText = retryResponse.content.toString();
+
+			extractedJSON = extractJSON(retryResponseText);
+
+			if (extractedJSON) {
+				console.log(
+					"[ConfidenceScorerNode] Successfully extracted JSON from retry attempt.",
+				);
+				const parsed = JSON.parse(extractedJSON);
+				const score = parsed.score || "medium";
+				console.log("[ConfidenceScorerNode] Confidence Score:", score);
+				console.log(
+					"[ConfidenceScorerNode] Reasoning:",
+					parsed.reasoning || "Unable to evaluate confidence.",
+				);
+				return {
+					scoreConfidence: score,
+					reasoningConfidence:
+						parsed.reasoning || "Unable to evaluate confidence.",
+				};
+			}
+
+			// Both attempts failed, return default values
+			console.log(
+				"[ConfidenceScorerNode] JSON extraction failed on retry. Using default values.",
+			);
+			return {
+				scoreConfidence: undefined,
+				reasoningConfidence: undefined,
+			};
+		} catch (retryError) {
+			console.error(
+				"[ConfidenceScorerNode] Error on retry attempt:",
+				retryError,
+			);
+			return {
+				scoreConfidence: undefined,
+				reasoningConfidence: undefined,
+			};
+		}
+	} catch (error) {
+		console.error("[ConfidenceScorerNode] Error evaluating confidence:", error);
+		return {
+			scoreConfidence: undefined,
+			reasoningConfidence: undefined,
+		};
+	}
 }
 
 // LowConfidenceFallback Node - Provides predefined fallback responses for low-confidence answers
-async function lowConfidenceFallbackNode(state: typeof AssistantAgentState.State): Promise<Partial<typeof AssistantAgentState.State>> {
-  const { question, conversation, styleProfile, scoreConfidence } = state;
-  console.log(`[LowConfidenceFallbackNode] Evaluating fallback for score: ${scoreConfidence}`);
-  
-  // Only process if score is "low"
-  if (scoreConfidence !== 'low') {
-    console.log('[LowConfidenceFallbackNode] Score is not low, no fallback needed.');
-    return {};
-  }
-  
-  // Format conversation for the prompt
-  const conversationText = Object.entries(conversation || {})
-    .map(([key, value]) => `[${key}]: ${value}`)
-    .join('\n');
-  
-  const prompt = `
+async function lowConfidenceFallbackNode(
+	state: typeof AssistantAgentState.State,
+): Promise<Partial<typeof AssistantAgentState.State>> {
+	const { question, conversation, styleProfile, scoreConfidence } = state;
+	console.log(
+		`[LowConfidenceFallbackNode] Evaluating fallback for score: ${scoreConfidence}`,
+	);
+
+	// Only process if score is "low"
+	if (scoreConfidence !== "low") {
+		console.log(
+			"[LowConfidenceFallbackNode] Score is not low, no fallback needed.",
+		);
+		return {};
+	}
+
+	// Format conversation for the prompt
+	const conversationText = Object.entries(conversation || {})
+		.map(([key, value]) => `[${key}]: ${value}`)
+		.join("\n");
+
+	const prompt = `
   You are a style adapter. The assistant's answer had low confidence, so you need to provide a fallback response.
   
   ### YOUR TASK ###
@@ -712,7 +800,7 @@ async function lowConfidenceFallbackNode(state: typeof AssistantAgentState.State
   
   ### CONVERSATION HISTORY ###
   
-  ${conversationText || 'No conversation history available.'}
+  ${conversationText || "No conversation history available."}
   
   ### QUESTION ###
   
@@ -722,174 +810,203 @@ async function lowConfidenceFallbackNode(state: typeof AssistantAgentState.State
   - The adapted response should sound completely natural and authentic to the user's voice.
   `;
 
-  try {
-    const response = await llm.invoke([new HumanMessage(prompt)]);
-    const responseText = response.content.toString();
-    
-    // Try to extract JSON from the response
-    let extractedJSON = extractJSON(responseText);
-    
-    if (extractedJSON) {
-      console.log('[LowConfidenceFallbackNode] Successfully extracted JSON from first attempt.');
-      console.log('[LowConfidenceFallbackNode] Fallback response:', extractedJSON);
-      return {
-        response: extractedJSON
-      };
-    }
-    
-    // First attempt failed, retry with more explicit prompt
-    console.log('[LowConfidenceFallbackNode] JSON extraction failed. Retrying with more explicit prompt...');
-    const retryPrompt = `${prompt}
+	try {
+		const response = await llm.invoke([new HumanMessage(prompt)]);
+		const responseText = response.content.toString();
+
+		// Try to extract JSON from the response
+		let extractedJSON = extractJSON(responseText);
+
+		if (extractedJSON) {
+			console.log(
+				"[LowConfidenceFallbackNode] Successfully extracted JSON from first attempt.",
+			);
+			console.log(
+				"[LowConfidenceFallbackNode] Fallback response:",
+				extractedJSON,
+			);
+			return {
+				response: extractedJSON,
+			};
+		}
+
+		// First attempt failed, retry with more explicit prompt
+		console.log(
+			"[LowConfidenceFallbackNode] JSON extraction failed. Retrying with more explicit prompt...",
+		);
+		const retryPrompt = `${prompt}
     
     IMPORTANT: Your previous response could not be parsed as valid JSON. Please respond with ONLY a valid JSON object with a "text" field, with no markdown formatting, no code blocks, no explanations, and no additional text. Start your response with { and end with }.`;
-    
-    try {
-      const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
-      const retryResponseText = retryResponse.content.toString();
-      
-      extractedJSON = extractJSON(retryResponseText);
-      
-      if (extractedJSON) {
-        console.log('[LowConfidenceFallbackNode] Successfully extracted JSON from retry attempt.');
-        console.log('[LowConfidenceFallbackNode] Fallback response:', extractedJSON);
-        return {
-          response: extractedJSON
-        };
-      }
-      
-      // Both attempts failed, use default fallback
-      console.log('[LowConfidenceFallbackNode] JSON extraction failed on retry. Using default fallback.');
-      return {
-        response: JSON.stringify({ text: "I'm not confident enough to answer this properly - you might want to ask someone more knowledgeable or just Google/GPT it." })
-      };
-    } catch (retryError) {
-      console.error('[LowConfidenceFallbackNode] Error on retry attempt:', retryError);
-      return {
-        response: JSON.stringify({ text: "I'm not confident enough to answer this properly - you might want to ask someone more knowledgeable or just Google/GPT it." })
-      };
-    }
-  } catch (error) {
-    console.error('[LowConfidenceFallbackNode] Error generating fallback:', error);
-    return {
-      response: JSON.stringify({ text: "I'm not confident enough to answer this properly - you might want to ask someone more knowledgeable or just Google/GPT it." })
-    };
-  }
+
+		try {
+			const retryResponse = await llm.invoke([new HumanMessage(retryPrompt)]);
+			const retryResponseText = retryResponse.content.toString();
+
+			extractedJSON = extractJSON(retryResponseText);
+
+			if (extractedJSON) {
+				console.log(
+					"[LowConfidenceFallbackNode] Successfully extracted JSON from retry attempt.",
+				);
+				console.log(
+					"[LowConfidenceFallbackNode] Fallback response:",
+					extractedJSON,
+				);
+				return {
+					response: extractedJSON,
+				};
+			}
+
+			// Both attempts failed, use default fallback
+			console.log(
+				"[LowConfidenceFallbackNode] JSON extraction failed on retry. Using default fallback.",
+			);
+			return {
+				response: JSON.stringify({
+					text: "I'm not confident enough to answer this properly - you might want to ask someone more knowledgeable or just Google/GPT it.",
+				}),
+			};
+		} catch (retryError) {
+			console.error(
+				"[LowConfidenceFallbackNode] Error on retry attempt:",
+				retryError,
+			);
+			return {
+				response: JSON.stringify({
+					text: "I'm not confident enough to answer this properly - you might want to ask someone more knowledgeable or just Google/GPT it.",
+				}),
+			};
+		}
+	} catch (error) {
+		console.error(
+			"[LowConfidenceFallbackNode] Error generating fallback:",
+			error,
+		);
+		return {
+			response: JSON.stringify({
+				text: "I'm not confident enough to answer this properly - you might want to ask someone more knowledgeable or just Google/GPT it.",
+			}),
+		};
+	}
 }
 
 // Create the multi-node Assistant workflow
 function createAssistantGraph() {
-  const workflow = new StateGraph(AssistantAgentState)
-    .addNode("decideIfReply", decideIfReplyNode)
-    .addNode("answerQuestion", answerQuestionNode)
-    .addNode("styleRefiner", styleRefinerNode)
-    .addNode("decideIfDumb", decideIfDumbNode)
-    .addNode("confidenceScorer", confidenceScorerNode)
-    .addNode("lowConfidenceFallback", lowConfidenceFallbackNode)
-    .addEdge(START, "decideIfReply")
-    .addConditionalEdges(
-      "decideIfReply",
-      (state) => {
-        // If to_reply is false, end the workflow
-        // If to_reply is true, continue to answerQuestion
-        return state.to_reply ? "answerQuestion" : END;
-      }
-    )
-    .addEdge("answerQuestion", "styleRefiner")
-    .addEdge("styleRefiner", "decideIfDumb")
-    .addConditionalEdges(
-      "decideIfDumb",
-      (state) => {
-        // If is_dumb is true (simple social comment), end the workflow
-        // If is_dumb is false (meaningful question), continue to confidenceScorer
-        return state.is_dumb ? END : "confidenceScorer";
-      }
-    )
-    .addEdge("confidenceScorer", "lowConfidenceFallback")
-    .addEdge("lowConfidenceFallback", END);
+	const workflow = new StateGraph(AssistantAgentState)
+		.addNode("decideIfReply", decideIfReplyNode)
+		.addNode("answerQuestion", answerQuestionNode)
+		.addNode("styleRefiner", styleRefinerNode)
+		.addNode("decideIfDumb", decideIfDumbNode)
+		.addNode("confidenceScorer", confidenceScorerNode)
+		.addNode("lowConfidenceFallback", lowConfidenceFallbackNode)
+		.addEdge(START, "decideIfReply")
+		.addConditionalEdges("decideIfReply", (state) => {
+			// If to_reply is false, end the workflow
+			// If to_reply is true, continue to answerQuestion
+			return state.to_reply ? "answerQuestion" : END;
+		})
+		.addEdge("answerQuestion", "styleRefiner")
+		.addEdge("styleRefiner", "decideIfDumb")
+		.addConditionalEdges("decideIfDumb", (state) => {
+			// If is_dumb is true (simple social comment), end the workflow
+			// If is_dumb is false (meaningful question), continue to confidenceScorer
+			return state.is_dumb ? END : "confidenceScorer";
+		})
+		.addEdge("confidenceScorer", "lowConfidenceFallback")
+		.addEdge("lowConfidenceFallback", END);
 
-  return workflow.compile();
+	return workflow.compile();
 }
 
 // Main assistant function that uses LangGraph
 export async function runAssistant(
-  styleProfile: string,
-  question: string,
-  creatorFid: number,
-  agentUsername: string,
-  conversation: Record<string, string>,
-  context?: { text: string }
+	styleProfile: string,
+	question: string,
+	creatorFid: number,
+	agentUsername: string,
+	conversation: Record<string, string>,
+	context?: { text: string },
 ): Promise<{
-  response: string;
-  score_confidence: string | null;
-  reasoning_confidence: string | null;
+	response: string;
+	score_confidence: string | null;
+	reasoning_confidence: string | null;
 }> {
-  console.log(`[Assistant] Starting assistant with question: ${question}`);
-  
-  const langfuseHandler = new CallbackHandler({
-    secretKey: process.env.LANGFUSE_SECRET_KEY,
-    publicKey: process.env.LANGFUSE_PUBLIC_KEY,
-    baseUrl: process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com',
-  });
+	console.log(`[Assistant] Starting assistant with question: ${question}`);
 
-  try {
-    // Create the graph
-    const graph = createAssistantGraph();
-    
-    // Run the graph 
-    const result = await graph.invoke({
-      styleProfile: styleProfile,
-      question: question,
-      conversation: conversation,
-      agentUsername: agentUsername,
-      context: context || { text: '' }
-    }, { 
-      callbacks: [langfuseHandler], 
-      metadata: { 
-        langfuseSessionId: `xbtify-${creatorFid}`,
-        apiType: 'ask'
-      } 
-    });
-    
-    // Handle early exit when no reply is needed
-    if (result.to_reply === false) {
-      console.log('[Assistant] No reply needed based on conversation analysis.');
-      return {
-        response: "No reply needed",
-        score_confidence: null,
-        reasoning_confidence: null,
-      };
-    }
-    
-    // Handle early exit when question is a simple social comment
-    if (result.is_dumb === true) {
-      console.log('[Assistant] Question is a simple social comment, returning without confidence scoring.');
-      return {
-        response: result.response || JSON.stringify({ text: '' }),
-        score_confidence: null,
-        reasoning_confidence: null,
-      };
-    }
-    
-    // Normal return with all fields populated
-    return {
-      response: result.response || JSON.stringify({ text: '' }),
-      score_confidence: result.scoreConfidence ?? 'medium',
-      reasoning_confidence: result.reasoningConfidence || 'Unable to evaluate confidence.',
-    };
-  } catch (error) {
-    console.error('[Assistant] Error running assistant:', error);
-    return {
-      response: JSON.stringify({ text: "I'm sorry, there was an error processing your request. Please try again." }),
-      score_confidence: 'medium',
-      reasoning_confidence: 'Error occurred during processing.',
-    };
-  } finally {
-    // Flush pending Langfuse operations
-    try {
-      await langfuseHandler.shutdownAsync();
-    } catch (error) {
-      console.error('[Assistant] Error shutting down Langfuse:', error);
-    }
-  }
+	const langfuseHandler = new CallbackHandler({
+		secretKey: process.env.LANGFUSE_SECRET_KEY,
+		publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+		baseUrl: process.env.LANGFUSE_BASE_URL || "https://cloud.langfuse.com",
+	});
+
+	try {
+		// Create the graph
+		const graph = createAssistantGraph();
+
+		// Run the graph
+		const result = await graph.invoke(
+			{
+				styleProfile: styleProfile,
+				question: question,
+				conversation: conversation,
+				agentUsername: agentUsername,
+				context: context || { text: "" },
+			},
+			{
+				callbacks: [langfuseHandler],
+				metadata: {
+					langfuseSessionId: `xbtify-${creatorFid}`,
+					apiType: "ask",
+				},
+			},
+		);
+
+		// Handle early exit when no reply is needed
+		if (result.to_reply === false) {
+			console.log(
+				"[Assistant] No reply needed based on conversation analysis.",
+			);
+			return {
+				response: "No reply needed",
+				score_confidence: null,
+				reasoning_confidence: null,
+			};
+		}
+
+		// Handle early exit when question is a simple social comment
+		if (result.is_dumb === true) {
+			console.log(
+				"[Assistant] Question is a simple social comment, returning without confidence scoring.",
+			);
+			return {
+				response: result.response || JSON.stringify({ text: "" }),
+				score_confidence: null,
+				reasoning_confidence: null,
+			};
+		}
+
+		// Normal return with all fields populated
+		return {
+			response: result.response || JSON.stringify({ text: "" }),
+			score_confidence: result.scoreConfidence ?? "medium",
+			reasoning_confidence:
+				result.reasoningConfidence || "Unable to evaluate confidence.",
+		};
+	} catch (error) {
+		console.error("[Assistant] Error running assistant:", error);
+		return {
+			response: JSON.stringify({
+				text: "I'm sorry, there was an error processing your request. Please try again.",
+			}),
+			score_confidence: "medium",
+			reasoning_confidence: "Error occurred during processing.",
+		};
+	} finally {
+		// Flush pending Langfuse operations
+		try {
+			await langfuseHandler.shutdownAsync();
+		} catch (error) {
+			console.error("[Assistant] Error shutting down Langfuse:", error);
+		}
+	}
 }
-

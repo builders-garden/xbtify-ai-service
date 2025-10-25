@@ -1,7 +1,7 @@
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { env } from '../../config/env.js';
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { env } from "../../config/env.js";
 
-const MODEL_NAME = 'text-embedding-3-large';
+const MODEL_NAME = "text-embedding-3-large";
 let embeddingModel: OpenAIEmbeddings | null = null;
 
 /**
@@ -15,30 +15,32 @@ function getEmbeddingModel(): OpenAIEmbeddings {
 			model: MODEL_NAME,
 			dimensions: 768,
 		});
-		console.log(`[embeddings] Model initialized successfully`);
+		console.log("[embeddings] Model initialized successfully");
 	}
 	return embeddingModel;
 }
 
 /**
  * Creates embeddings for an array of texts using OpenAI's text-embedding-3-large model
- * 
+ *
  * @param texts - Array of text strings to embed
  * @returns Promise resolving to array of embeddings (each embedding is a 768-dimensional vector)
  */
 export async function createEmbeddings(texts: string[]): Promise<number[][]> {
 	console.log(`[embeddings] Creating embeddings for ${texts.length} texts...`);
-	
+
 	const model = getEmbeddingModel();
 	const embeddings = await model.embedDocuments(texts);
 
-	console.log(`[embeddings] Generated ${embeddings.length} embeddings (dimension: ${embeddings[0]?.length || 0})`);
+	console.log(
+		`[embeddings] Generated ${embeddings.length} embeddings (dimension: ${embeddings[0]?.length || 0})`,
+	);
 	return embeddings;
 }
 
 /**
  * Creates a single embedding for a query text
- * 
+ *
  * @param text - Text string to embed
  * @returns Promise resolving to a 768-dimensional embedding vector
  */
@@ -47,4 +49,3 @@ export async function createQueryEmbedding(text: string): Promise<number[]> {
 	const embedding = await model.embedQuery(text);
 	return embedding;
 }
-

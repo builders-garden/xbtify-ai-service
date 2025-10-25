@@ -1,5 +1,5 @@
 import { reinitializeAgent } from "../services/agent.service.js";
-import { AgentReinitJobData } from "../types/queue.type.js";
+import type { AgentReinitJobData } from "../types/queue.type.js";
 
 export async function processAgentReinitialization(
 	agentReinitializationOptions: AgentReinitJobData,

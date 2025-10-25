@@ -1,7 +1,7 @@
-import { Pinecone } from '@pinecone-database/pinecone';
-import { PineconeStore } from '@langchain/pinecone';
-import { env } from '../../config/env.js';
-import { createQueryEmbedding } from './embeddings.js';
+import { PineconeStore } from "@langchain/pinecone";
+import { Pinecone } from "@pinecone-database/pinecone";
+import { env } from "../../config/env.js";
+import { createQueryEmbedding } from "./embeddings.js";
 
 let pineconeClient: Pinecone | null = null;
 
@@ -23,7 +23,7 @@ function getPineconeClient(): Pinecone {
 class OpenAIEmbeddings {
 	async embedDocuments(texts: string[]): Promise<number[][]> {
 		// This shouldn't be called in retrieval, but implementing for completeness
-		const { createEmbeddings } = await import('./embeddings.js');
+		const { createEmbeddings } = await import("./embeddings.js");
 		return createEmbeddings(texts);
 	}
 
@@ -34,7 +34,7 @@ class OpenAIEmbeddings {
 
 /**
  * Retrieves relevant context from Pinecone based on a query
- * 
+ *
  * @param creatorFid - The Farcaster ID to filter results by
  * @param query - The user's question/query
  * @param topK - Number of top results to retrieve (default: 3)
@@ -43,11 +43,13 @@ class OpenAIEmbeddings {
 export async function retrieveContext(
 	creatorFid: number,
 	query: string,
-	topK = 3
+	topK = 3,
 ): Promise<string[]> {
-	const indexName = 'farcaster';
-	console.log(`[retrieval] Retrieving context for query from index: ${indexName} (creatorFid: ${creatorFid})`);
-	
+	const indexName = "farcaster";
+	console.log(
+		`[retrieval] Retrieving context for query from index: ${indexName} (creatorFid: ${creatorFid})`,
+	);
+
 	try {
 		const pc = getPineconeClient();
 		const index = pc.index(indexName);
@@ -61,7 +63,9 @@ export async function retrieveContext(
 		});
 
 		// Perform similarity search with creatorFid filter
-		const results = await vectorStore.similaritySearch(query, topK, { creatorFid });
+		const results = await vectorStore.similaritySearch(query, topK, {
+			creatorFid,
+		});
 
 		// Extract text content from results
 		const contexts = results.map((doc) => doc.pageContent);
@@ -69,9 +73,8 @@ export async function retrieveContext(
 		console.log(`[retrieval] Retrieved ${contexts.length} relevant chunks`);
 		return contexts;
 	} catch (error) {
-		console.error(`[retrieval] Error retrieving context:`, error);
+		console.error("[retrieval] Error retrieving context:", error);
 		// Return empty array if retrieval fails (e.g., index doesn't exist yet)
 		return [];
 	}
 }
-

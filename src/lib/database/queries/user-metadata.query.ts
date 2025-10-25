@@ -1,11 +1,11 @@
 import { eq } from "drizzle-orm";
-import { db } from "../index.js";
 import type {
 	CreateUserMetadata,
 	UpdateUserMetadata,
 	UserMetadata,
 } from "../db.schema.js";
 import { userMetadataTable } from "../db.schema.js";
+import { db } from "../index.js";
 
 /**
  * Get user metadata by FID

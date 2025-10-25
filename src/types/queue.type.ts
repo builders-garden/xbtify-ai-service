@@ -13,7 +13,7 @@ export interface NeynarWebhookJobData {
 			displayName?: string;
 			bio?: string;
 			avatarUrl?: string;
-		}
+		};
 	};
 }
 

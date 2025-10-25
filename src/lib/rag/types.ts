@@ -3,4 +3,3 @@ export interface ChunkData {
 	text: string;
 	creatorFid: number;
 }
-

@@ -1,18 +1,18 @@
 import express from "express";
+import ky from "ky";
+import { SiweMessage } from "siwe";
+import { createWalletClient, http } from "viem";
+import { mnemonicToAccount } from "viem/accounts";
+import { mainnet } from "viem/chains";
+import { env } from "../config/env.js";
 import {
 	getAgentInfoController,
 	handleAskAgentController,
 	initAgentController,
 	reinitializeAgentController,
 } from "../controllers/agent.controller.js";
-import { getNegativeImageAndUpload } from "../lib/image.js";
 import { getAgentByFid } from "../lib/database/queries/agent.query.js";
-import ky from "ky";
-import { env } from "../config/env.js";
-import { createWalletClient, http } from "viem";
-import { mnemonicToAccount } from "viem/accounts";
-import { mainnet } from "viem/chains";
-import { SiweMessage } from "siwe";
+import { getNegativeImageAndUpload } from "../lib/image.js";
 
 const router = express.Router();
 
@@ -59,11 +59,13 @@ router.get("/:fid/signers/recovery", async (req, res) => {
 
 		// Step 1: Fetch nonce from Neynar
 		console.log("=== Step 1: Fetching nonce from Neynar ===");
-		const nonceResponse = await ky.get("https://api.neynar.com/v2/farcaster/login/nonce", {
-			headers: {
-				"x-api-key": env.NEYNAR_API_KEY,
-			},
-		}).json<{ nonce: string }>();
+		const nonceResponse = await ky
+			.get("https://api.neynar.com/v2/farcaster/login/nonce", {
+				headers: {
+					"x-api-key": env.NEYNAR_API_KEY,
+				},
+			})
+			.json<{ nonce: string }>();
 
 		const nonce = nonceResponse.nonce;
 		console.log("Nonce received:", nonce);
@@ -94,15 +96,18 @@ router.get("/:fid/signers/recovery", async (req, res) => {
 		// Step 4: Fetch signers from Neynar using the signed message
 		console.log("=== Step 4: Fetching signers from Neynar ===");
 		try {
-			const response = await ky.get("https://api.neynar.com/v2/farcaster/signer/list/", {
-				searchParams: {
-					message: messageToSign, // Use the prepared message string
-					signature: signature,
+			const response = await ky.get(
+				"https://api.neynar.com/v2/farcaster/signer/list/",
+				{
+					searchParams: {
+						message: messageToSign, // Use the prepared message string
+						signature: signature,
+					},
+					headers: {
+						"x-api-key": env.NEYNAR_API_KEY,
+					},
 				},
-				headers: {
-					"x-api-key": env.NEYNAR_API_KEY,
-				},
-			});
+			);
 
 			console.log("Neynar response status:", response.status);
 
@@ -126,20 +131,21 @@ router.get("/:fid/signers/recovery", async (req, res) => {
 				nonce: nonce,
 				address: address,
 			});
+			/** biome-ignore lint/suspicious/noExplicitAny: ky error */
 		} catch (neynarError: any) {
 			console.error("=== Neynar API Error ===");
 			console.error("Error:", neynarError);
-			
+
 			// Try to extract error details from ky HTTPError
 			if (neynarError.response) {
 				const status = neynarError.response.status;
 				console.error("Response status:", status);
-				
+
 				try {
 					const errorBody = await neynarError.response.text();
 					console.error("Response body:", errorBody);
-					
-					return res.status(status).json({ 
+
+					return res.status(status).json({
 						error: "Failed to fetch signers from Neynar",
 						details: errorBody,
 						status: status,
@@ -151,8 +157,8 @@ router.get("/:fid/signers/recovery", async (req, res) => {
 					console.error("Could not parse error response:", parseError);
 				}
 			}
-			
-			return res.status(500).json({ 
+
+			return res.status(500).json({
 				error: "Failed to fetch signers from Neynar",
 				details: neynarError.message || "Unknown error",
 				message: messageToSign,
@@ -160,12 +166,13 @@ router.get("/:fid/signers/recovery", async (req, res) => {
 				address: address,
 			});
 		}
+		/** biome-ignore lint/suspicious/noExplicitAny: neynar error */
 	} catch (error: any) {
 		console.error("=== General Error ===");
 		console.error("Error fetching signer UUID:", error);
 		console.error("Error message:", error.message);
 		console.error("Error stack:", error.stack);
-		return res.status(500).json({ 
+		return res.status(500).json({
 			error: "Failed to fetch signer UUID",
 			details: error.message || "Unknown error",
 		});

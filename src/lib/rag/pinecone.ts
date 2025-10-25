@@ -1,9 +1,9 @@
-import { Pinecone } from '@pinecone-database/pinecone';
-import { env } from '../../config/env.js';
-import type { ChunkData } from './types.js';
+import { Pinecone } from "@pinecone-database/pinecone";
+import { env } from "../../config/env.js";
+import type { ChunkData } from "./types.js";
 
 const EMBEDDING_DIMENSION = 768;
-const METRIC = 'cosine';
+const METRIC = "cosine";
 
 let pineconeClient: Pinecone | null = null;
 
@@ -21,19 +21,21 @@ function getPineconeClient(): Pinecone {
 
 /**
  * Creates a Pinecone index if it doesn't exist and uploads chunk embeddings
- * 
+ *
  * @param chunks - Array of ChunkData objects containing text content and creatorFid
  * @param embeddings - Array of embedding vectors (768-dimensional)
  */
 export async function createAndUploadToPinecone(
 	chunks: ChunkData[],
-	embeddings: number[][]
+	embeddings: number[][],
 ): Promise<void> {
-	const indexName = 'farcaster';
+	const indexName = "farcaster";
 	console.log(`[pinecone] Starting upload to index: ${indexName}`);
-	
+
 	if (chunks.length !== embeddings.length) {
-		throw new Error(`Mismatch: ${chunks.length} chunks but ${embeddings.length} embeddings`);
+		throw new Error(
+			`Mismatch: ${chunks.length} chunks but ${embeddings.length} embeddings`,
+		);
 	}
 
 	const pc = getPineconeClient();
@@ -50,14 +52,14 @@ export async function createAndUploadToPinecone(
 			metric: METRIC,
 			spec: {
 				serverless: {
-					cloud: 'aws',
-					region: 'us-east-1',
+					cloud: "aws",
+					region: "us-east-1",
 				},
 			},
 		});
-		
+
 		// Wait for index to be ready
-		console.log(`[pinecone] Waiting for index to be ready...`);
+		console.log("[pinecone] Waiting for index to be ready...");
 		await waitForIndexReady(pc, indexName);
 	} else {
 		console.log(`[pinecone] Index already exists: ${indexName}`);
@@ -82,23 +84,33 @@ export async function createAndUploadToPinecone(
 	for (let i = 0; i < vectors.length; i += batchSize) {
 		const batch = vectors.slice(i, i + batchSize);
 		await index.upsert(batch);
-		console.log(`[pinecone] Uploaded batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(vectors.length / batchSize)}`);
+		console.log(
+			`[pinecone] Uploaded batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(vectors.length / batchSize)}`,
+		);
 	}
 
-	console.log(`[pinecone] Successfully uploaded ${vectors.length} vectors to ${indexName}`);
+	console.log(
+		`[pinecone] Successfully uploaded ${vectors.length} vectors to ${indexName}`,
+	);
 }
 
 /**
  * Waits for a Pinecone index to be ready
  */
-async function waitForIndexReady(pc: Pinecone, indexName: string, maxAttempts = 30): Promise<void> {
+async function waitForIndexReady(
+	pc: Pinecone,
+	indexName: string,
+	maxAttempts = 30,
+): Promise<void> {
 	for (let i = 0; i < maxAttempts; i++) {
 		const indexDescription = await pc.describeIndex(indexName);
 		if (indexDescription.status?.ready) {
 			console.log(`[pinecone] Index ${indexName} is ready`);
 			return;
 		}
-		console.log(`[pinecone] Waiting for index... (attempt ${i + 1}/${maxAttempts})`);
+		console.log(
+			`[pinecone] Waiting for index... (attempt ${i + 1}/${maxAttempts})`,
+		);
 		await new Promise((resolve) => setTimeout(resolve, 2000));
 	}
 	throw new Error(`Index ${indexName} did not become ready in time`);
@@ -106,7 +118,7 @@ async function waitForIndexReady(pc: Pinecone, indexName: string, maxAttempts = 
 
 /**
  * Deletes a Pinecone index
- * 
+ *
  * @param indexName - Name of the index to delete
  */
 export async function deleteIndex(indexName: string): Promise<void> {
@@ -115,4 +127,3 @@ export async function deleteIndex(indexName: string): Promise<void> {
 	await pc.deleteIndex(indexName);
 	console.log(`[pinecone] Index deleted: ${indexName}`);
 }
-
