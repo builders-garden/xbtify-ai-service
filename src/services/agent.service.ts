@@ -65,7 +65,7 @@ export const initAgent = async (data: AgentInitJobData) => {
 			displayName: newDisplayName,
 			bio: `digital twin of @${farcasterUser.username}`,
 			pfpUrl,
-			url: `https://farcaster.xyz/miniapps/uCblhT33K2_3/xbtify/${farcasterUser.fid}`,
+			url: `https://farcaster.xyz/miniapps/uCblhT33K2_3/xbtify/agent/${farcasterUser.fid}`,
 		});
 
 		// step 1: create farcaster user
@@ -75,7 +75,7 @@ export const initAgent = async (data: AgentInitJobData) => {
 			displayName: newDisplayName,
 			bio: `digital twin of @${farcasterUser.username}`,
 			pfpUrl,
-			url: `https://farcaster.xyz/miniapps/uCblhT33K2_3/xbtify/${farcasterUser.fid}`,
+			url: `https://farcaster.xyz/miniapps/uCblhT33K2_3/xbtify/agent/${farcasterUser.fid}`,
 		});
 		console.log("Farcaster account created:", farcasterAccount);
 
